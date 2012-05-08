@@ -1,15 +1,17 @@
-#ifndef AvcImu_h
-#define AvcImu_h
+#ifndef AvcNav_h
+#define AvcNav_h
 
 #include "Arduino.h"
 #include <Streaming.h>
 #include "AvcGps.h"
 #include <TinyGPS.h>
+#include "AvcImu.h"
+#include "Avc.h"
 
 #define BUF_SIZE 256
 #define NUM_ELEMENTS 8
 
-class AvcImu {
+class AvcNav {
   long latitude;
   long longitude;
   float hdop;
@@ -18,19 +20,20 @@ class AvcImu {
   float speed;
   boolean waasLock;
   int heading;
-  char buf[BUF_SIZE];
-  byte checksumIdx;
-  byte charCount;
-  boolean invalid;
-  boolean objectComplete;
+  AvcGps *waypoints[WAYPOINT_COUNT];
+  int waypointSamplingIndex;
+  int numWaypointsSet;
+  int nextWaypoint;
+  int bestKnownHeading;
 
 public:
-  AvcImu ();
-  void parse (char c);
-  void reset();
+  AvcNav ();
+  int pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoints);
+  void steer ();
+  void update (AvcImu*);
+  boolean sample ();
+  void resetWaypoints();
   
-  inline boolean isValid() {return invalid == false;}
-  inline boolean isComplete() {return objectComplete;}
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
   inline float getHdop() {return hdop;}
@@ -39,9 +42,13 @@ public:
   inline float getSpeed() {return speed;}
   inline boolean hasWaasLock() {return waasLock;}
   inline int getHeading() {return heading;}
+  inline float toFloat (long fixed) {return fixed / 1000000.0;}
+  inline int getHeadingTo (AvcGps *dest) {
+    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(dest->getLatitude()), toFloat(dest->getLongitude() - longitude));
+  }
 
   inline void print() {
-    Serial << "IMU" << "\t" <<
+    Serial << "NAV" << "\t" <<
         latitude << "\t" <<
         longitude << "\t" <<
         hdop << "\t" <<

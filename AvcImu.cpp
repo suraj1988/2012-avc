@@ -1,20 +1,7 @@
 #include "AvcImu.h"
 
 AvcImu::AvcImu () {
-  latitude = 0;
-  longitude = 0;
-  hdop = 0;
-  distanceTraveled = 0;
-  fixTime = 0;
-  speed = 0;
-  waasLock = false;
-  heading = 0;
-  checksumIdx = 0;
-  charCount = 0;
-  elementCount = 0;
-  invalid  = false;
-  objectComplete = false;
-
+  reset();
 }
 
 void AvcImu::parse (char c) {
@@ -83,5 +70,20 @@ void AvcImu::parse (char c) {
       checksumIdx = charCount - 1;
       return;
   }
+}
+
+void AvcImu::reset () {
+  latitude = 0;
+  longitude = 0;
+  hdop = 0;
+  distanceTraveled = 0;
+  fixTime = 0;
+  speed = 0;
+  waasLock = false;
+  heading = 0;
+  checksumIdx = 0;
+  charCount = 0;
+  invalid  = false;
+  objectComplete = false;
 }
 

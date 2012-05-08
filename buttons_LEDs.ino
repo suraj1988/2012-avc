@@ -43,21 +43,22 @@ void controlGpsLed (Gps *gps) {
   }
 }
 
-void checkButtons () {
+void checkButtons (AvcNav *nav) {
   if (isButtonPressed(SET_WAYPOINT_BUTTON)) {
-    if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || isSamplingGps) {
-      return;
-    }
+//    if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || isSamplingGps) {
+//      return;
+//    }
     isSamplingGps = true;
-    waypointSamplingIndex++;
-    numWaypointsSet++;
+//    waypointSamplingIndex++;
+//    numWaypointsSet++;
   } else if (isButtonPressed(RESET_BUTTON)) {
-    waypointSamplingIndex = -1;
-    numWaypointsSet = 0;
-    nextWaypoint = 0;
-    for (int ii = 0; ii < WAYPOINT_COUNT; ii++) {
-      delete waypoints[ii];
-      waypoints[ii] = 0;
-    }
+    nav->resetWaypoints();
+//    waypointSamplingIndex = -1;
+//    numWaypointsSet = 0;
+//    nextWaypoint = 0;
+//    for (int ii = 0; ii < WAYPOINT_COUNT; ii++) {
+//      delete waypoints[ii];
+//      waypoints[ii] = 0;
+//    }
   }
 }

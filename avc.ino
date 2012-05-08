@@ -9,11 +9,11 @@
 #include <Streaming.h>
 #include "AvcPid.h"
 #include <math.h>
+#include "AvcNav.h"
+#include "AvcGps.h"
+#include "Avc.h"
 #include "AvcImu.h"
 
-#define STEERING_CENTER 180
-#define MIN_STEERING 105
-#define MAX_STEERING 255
 
 // booleans
 #define PRINT_BUTTON_STATUS 0
@@ -26,12 +26,10 @@
 #define SET_WAYPOINT_BUTTON A2
 #define RESET_BUTTON A3
 #define GPS_LED 8
-#define SERVO_PIN 9
 
 #define SAMPLING_BLINK_MILLIS 200
 #define WAAS_BLINK_MILLIS 1000
 #define SAMPLING_COUNT 50
-#define WAYPOINT_COUNT 4
 #define REORIENT_THRESHOLD 20
 #define MAX_PID_DEVIATION_FROM_COMPASS 120
 #define MAX_STEERING_CHANGE 5
@@ -42,12 +40,8 @@ int normalizedHeading;
 float gpsHeading;
 boolean reorient = true;
 
-Gps *waypoints[WAYPOINT_COUNT];
-int waypointSamplingIndex = -1;
-float samplingHdop = 0;
-int sampleCount = 0;
-int nextWaypoint = 0;
-int numWaypointsSet = 0;
+//float samplingHdop = 0;
+//int sampleCount = 0;
 
 // LED vars
 boolean isSamplingGps = false;
@@ -61,14 +55,16 @@ boolean pidActive = false;
 #define RXPIN 4
 #define TXPIN 5
 
-SoftwareSerial imuSerial(RXPIN, TXPIN);
-Gps location;
+SoftwareSerial navSerial(RXPIN, TXPIN);
+//Gps location;
+AvcNav *nav;
 AvcImu *imu;
 
 void setup()
 {
   Serial.begin(57600);
-  imuSerial.begin(9600);
+  navSerial.begin(9600);
+  pinMode(SERVO_PIN, OUTPUT);
 //  Compass_Init();
 //  pinMode(SET_WAYPOINT_BUTTON, INPUT);
 //  pinMode(RESET_BUTTON, INPUT);
@@ -85,29 +81,34 @@ void setup()
 //    waypoints[ii] = 0;
 //  }
 //  distances();
-imu = new AvcImu;
+nav = new AvcNav();
+imu = new AvcImu();
 }
 
 void loop()
 {
-  while (imuSerial.available()) {
-    byte c = imuSerial.read();
+  while (navSerial.available()) {
+    byte c = navSerial.read();
     Serial.write(c);
     imu->parse(c);
     if (imu->isComplete()) {
-      if (imu->isValid() == false) {
-        Serial.println ("invalid Object");
-      } else {
-        imu->print();
+      if (imu->isValid()) {
+        //imu->print();
+        nav->update(imu);
+        //nav->print();
+        if (isSamplingGps) {
+          isSamplingGps = !nav->sample();
+        }
+        Serial << "invalid" << endl;
       }
-      delete imu;
-      imu = new AvcImu();
-      if (imu->isComplete()) {
-        Serial << "starts complete" << endl;
-      }
+      imu->reset();
+      break;
     }
   }
-//  checkButtons();
+  if (!isSamplingGps) {
+    //checkButtons(nav);
+    nav->steer();
+  }
 //  if (isSamplingGps) {
 //    Gps *wp = waypoints[waypointSamplingIndex];
 //    if (!wp) {
