@@ -13,6 +13,8 @@ AvcNav::AvcNav () {
   numWaypointsSet = 0;
   nextWaypoint = 0;
   bestKnownHeading = 0;
+  sampling = false;
+  samples = 0;
 }
 
 int AvcNav::pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoints) {
@@ -27,7 +29,6 @@ int AvcNav::pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoin
 }
 
 void AvcNav::steer () {
-  Serial << heading;
   if (numWaypointsSet > 0) {
     int h = getHeadingTo(waypoints[nextWaypoint]);
     if (h >= 0) {
@@ -35,14 +36,12 @@ void AvcNav::steer () {
     }
   }
   int headingOffset = (heading - bestKnownHeading + 360) % 360;
-  Serial << "\t" << headingOffset;
   int steering = STEERING_CENTER;
   if(headingOffset >= 180) {
     steering = map(headingOffset, 180, 360, MAX_STEERING, STEERING_CENTER);
   } else {
     steering = map(headingOffset, 180, 0, MIN_STEERING, STEERING_CENTER);
   }
-  Serial << "\t" << steering << endl;
   analogWrite(SERVO_PIN, steering);
 //  if (numWaypointsSet >= 2 || DRIVE_TO_POINT == 1) {
 //    if (location.hasWaypointChanged()) {
@@ -118,20 +117,33 @@ void AvcNav::update (AvcImu *imu) {
   heading = imu->getHeading();
 }
 
-boolean AvcNav::sample () {
-  AvcGps *wp = waypoints[waypointSamplingIndex];
-  if (!wp) {
-    wp = new AvcGps;
+void AvcNav::sample () {
+  if (samples >= MAX_SAMPLES) {
+    sampling = false;
+    return;
   }
-  return !wp->sample(getLatitude(), getLongitude(), getHdop());
+  samples++;
+  AvcGps *wp = waypoints[waypointSamplingIndex];
+  wp->sample(getLatitude(), getLongitude(), getHdop());
 }
 
 void AvcNav::resetWaypoints() {
+  for (int ii = 0; ii < numWaypointsSet; ii++) {
+    delete waypoints[ii];
+  }
   waypointSamplingIndex = -1;
   numWaypointsSet = 0;
   nextWaypoint = 0;
-  for (int ii = 0; ii < WAYPOINT_COUNT; ii++) {
-    delete waypoints[ii];
-    waypoints[ii] = 0;
+  sampling = false;
+}
+
+void AvcNav::startSampling() {
+  if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || sampling) {
+    return;
   }
+  waypointSamplingIndex++;
+  numWaypointsSet++;
+  sampling = true;
+  samples = 0;
+  waypoints[waypointSamplingIndex] = new AvcGps();
 }

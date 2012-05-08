@@ -25,14 +25,17 @@ class AvcNav {
   int numWaypointsSet;
   int nextWaypoint;
   int bestKnownHeading;
+  boolean sampling;
+  int samples;
 
 public:
   AvcNav ();
   int pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoints);
   void steer ();
   void update (AvcImu*);
-  boolean sample ();
+  void sample ();
   void resetWaypoints();
+  void startSampling();
   
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
@@ -46,6 +49,7 @@ public:
   inline int getHeadingTo (AvcGps *dest) {
     return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(dest->getLatitude()), toFloat(dest->getLongitude() - longitude));
   }
+  inline boolean isSampling() {return sampling;}
 
   inline void print() {
     Serial << "NAV" << "\t" <<
@@ -58,6 +62,17 @@ public:
         waasLock << "\t" <<
         heading <<
         endl;
+  }
+  
+  inline void printWaypoints() {
+    if (numWaypointsSet > 0) {
+      for (int ii = 0; ii < numWaypointsSet; ii++) {
+        Serial << 
+            waypoints[ii]->getLatitude() << "\t" <<
+            waypoints[ii]->getLongitude() << "\t";
+      }
+      Serial << endl;
+    }
   }
 };
 #endif

@@ -9,10 +9,10 @@ int isButtonPressed (int button) {
   return 0;
 }
 
-void controlGpsLed (Gps *gps) {
+void controlGpsLed (AvcNav *nav) {
   long now = millis();
   int diff = now - ledTimer;
-  if (isSamplingGps) {
+  if (nav->isSampling()) {
     if (diff > SAMPLING_BLINK_MILLIS || diff < 0) {
       if (isLedOn == 1) {
         digitalWrite(GPS_LED, LOW);
@@ -23,7 +23,7 @@ void controlGpsLed (Gps *gps) {
       }
       ledTimer = now;
     }
-  } else if (gps->hasWaasLock()) {
+  } else if (nav->hasWaasLock()) {
     if (diff > WAAS_BLINK_MILLIS || diff < 0) {
       if (isLedOn == 1) {
         digitalWrite(GPS_LED, LOW);
@@ -34,9 +34,6 @@ void controlGpsLed (Gps *gps) {
       }
       ledTimer = now;
     }
-  } else if (gps->hasLock()) {
-    digitalWrite(GPS_LED, HIGH);
-    isLedOn = 1;
   } else {
     digitalWrite(GPS_LED, LOW);
     isLedOn = 0;
@@ -44,14 +41,15 @@ void controlGpsLed (Gps *gps) {
 }
 
 void checkButtons (AvcNav *nav) {
-  if (isButtonPressed(SET_WAYPOINT_BUTTON)) {
+  if (isButtonPressed(SET_WAYPOINT_PIN)) {
 //    if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || isSamplingGps) {
 //      return;
 //    }
-    isSamplingGps = true;
+//    isSamplingGps = true;
 //    waypointSamplingIndex++;
 //    numWaypointsSet++;
-  } else if (isButtonPressed(RESET_BUTTON)) {
+    nav->startSampling();
+  } else if (isButtonPressed(RESET_BUTTON_PIN)) {
     nav->resetWaypoints();
 //    waypointSamplingIndex = -1;
 //    numWaypointsSet = 0;

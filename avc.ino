@@ -23,8 +23,6 @@
 #define DRIVE_TO_POINT 0
 #define COMPASS_ONLY 1
 
-#define SET_WAYPOINT_BUTTON A2
-#define RESET_BUTTON A3
 #define GPS_LED 8
 
 #define SAMPLING_BLINK_MILLIS 200
@@ -44,7 +42,6 @@ boolean reorient = true;
 //int sampleCount = 0;
 
 // LED vars
-boolean isSamplingGps = false;
 int isLedOn = 0;
 boolean isGpsLock = false;
 
@@ -66,8 +63,11 @@ void setup()
   navSerial.begin(9600);
   pinMode(SERVO_PIN, OUTPUT);
 //  Compass_Init();
-//  pinMode(SET_WAYPOINT_BUTTON, INPUT);
-//  pinMode(RESET_BUTTON, INPUT);
+  pinMode(SET_WAYPOINT_PIN, INPUT);
+  pinMode(RESET_BUTTON_PIN, INPUT);
+  //enable internal pullup resistors
+  digitalWrite(SET_WAYPOINT_PIN, HIGH);
+  digitalWrite(RESET_BUTTON_PIN, HIGH);
 //  pinMode(GPS_LED,OUTPUT);
 //  Gps::init(&mySerial);
 //  pinMode(6,OUTPUT);
@@ -89,25 +89,22 @@ void loop()
 {
   while (navSerial.available()) {
     byte c = navSerial.read();
-    Serial.write(c);
     imu->parse(c);
     if (imu->isComplete()) {
       if (imu->isValid()) {
-        //imu->print();
         nav->update(imu);
-        //nav->print();
-        if (isSamplingGps) {
-          isSamplingGps = !nav->sample();
+        if (nav->isSampling()) {
+          nav->sample();
         }
-        Serial << "invalid" << endl;
       }
       imu->reset();
       break;
     }
   }
-  if (!isSamplingGps) {
-    //checkButtons(nav);
+  if (!nav->isSampling()) {
+    checkButtons(nav);
     nav->steer();
+    nav->printWaypoints();
   }
 //  if (isSamplingGps) {
 //    Gps *wp = waypoints[waypointSamplingIndex];
