@@ -24,7 +24,7 @@
 // for testing pid in a straight line
 #define DRIVE_TO_POINT 0
 
-#define GPS_LED 8
+#define HALL_SENSOR_PIN 2
 
 #define SAMPLING_BLINK_MILLIS 200
 #define WAAS_BLINK_MILLIS 1000
@@ -54,10 +54,11 @@ boolean pidActive = false;
 #define TXPIN 5
 
 SoftwareSerial navSerial(RXPIN, TXPIN);
-//Gps location;
 AvcNav *nav;
 AvcImu *imu;
 AvcLcd *lcd;
+
+volatile int rotations = 0;
 
 void setup()
 {
@@ -67,11 +68,11 @@ void setup()
 //  Compass_Init();
   pinMode(SET_WAYPOINT_PIN, INPUT);
   pinMode(RESET_BUTTON_PIN, INPUT);
+  pinMode(HALL_SENSOR_PIN, INPUT);
   //enable internal pullup resistors
   digitalWrite(SET_WAYPOINT_PIN, HIGH);
   digitalWrite(RESET_BUTTON_PIN, HIGH);
-//  pinMode(GPS_LED,OUTPUT);
-//  Gps::init(&mySerial);
+  digitalWrite(HALL_SENSOR_PIN, HIGH);
 //  pinMode(6,OUTPUT);
 //  digitalWrite(6,HIGH);
 //  pinMode(5,OUTPUT);
@@ -86,6 +87,7 @@ void setup()
 nav = new AvcNav();
 imu = new AvcImu();
 lcd = new AvcLcd();
+attachInterrupt(0, countRotations, CHANGE);
 }
 
 void loop() {
@@ -107,8 +109,9 @@ void loop() {
   if (!nav->isSampling()) {
     checkButtons(nav, lcd);
     nav->steer();
-    nav->printWaypoints();
+    //nav->printWaypoints();
   }
+  Serial << rotations << endl;
 //  if (isSamplingGps) {
 //    Gps *wp = waypoints[waypointSamplingIndex];
 //    if (!wp) {

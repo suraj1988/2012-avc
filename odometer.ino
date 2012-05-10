@@ -1,0 +1,6 @@
+
+
+
+void countRotations () {
+  rotations++;
+}

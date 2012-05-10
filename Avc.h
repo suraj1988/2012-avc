@@ -13,8 +13,8 @@
 #define MAX_STEERING 255
 
 #define SERVO_PIN 9
-#define SET_WAYPOINT_PIN 8
-#define RESET_BUTTON_PIN 7
+#define SET_WAYPOINT_PIN 11
+#define RESET_BUTTON_PIN 10
 
 #define COMPASS_ONLY 1
 
