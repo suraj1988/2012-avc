@@ -10,7 +10,7 @@ AvcNav::AvcNav (): pid() {
   waasLock = false;
   heading = 0;
   waypointSamplingIndex = -1;
-  numWaypointsSet = 0;
+  numWaypointsSet = max(AvcEeprom::getWayCount(), 0);
   nextWaypoint = 0;
   bestKnownHeading = 0;
   sampling = false;
@@ -21,8 +21,10 @@ AvcNav::AvcNav (): pid() {
 
 void AvcNav::pickWaypoint() {
   if (numWaypointsSet >= 2) {
+    long lat,lon;
+    AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
     float distanceFromWaypoint = TinyGPS::distance_between(toFloat(latitude), 0.0f, 
-        toFloat(waypoints[nextWaypoint]->getLatitude()), toFloat(waypoints[nextWaypoint]->getLongitude() - longitude));
+        toFloat(lat), toFloat(lon - longitude));
     if (distanceFromWaypoint < WAYPOINT_RADIUS) {
       nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
     }
@@ -32,7 +34,7 @@ void AvcNav::pickWaypoint() {
 void AvcNav::steer () {
   pickWaypoint();
   if (numWaypointsSet > 0) {
-    int h = getHeadingTo(waypoints[nextWaypoint]);
+    int h = getHeadingToWaypoint();
     if (h >= 0) {
       bestKnownHeading = h;
     }
@@ -140,19 +142,21 @@ void AvcNav::sample (AvcLcd *lcd) {
     return;
   }
   if (samples >= MAX_SAMPLES) {
+    long lat = tempWaypoint->getLatitude();
+    long lon = tempWaypoint->getLongitude();
+    AvcEeprom::writeLatLon (numWaypointsSet - 1, &lat, &lon);
+    delete tempWaypoint;
     sampling = false;
     lcd->resetMode();
     return;
   }
   samples++;
-  AvcGps *wp = waypoints[waypointSamplingIndex];
-  wp->sample(getLatitude(), getLongitude(), getHdop());
+  tempWaypoint->sample(getLatitude(), getLongitude(), getHdop());
 }
 
 void AvcNav::resetWaypoints() {
-  for (int ii = 0; ii < numWaypointsSet; ii++) {
-    delete waypoints[ii];
-  }
+  AvcEeprom::setWayCount(0);
+  delete tempWaypoint;
   waypointSamplingIndex = -1;
   numWaypointsSet = 0;
   nextWaypoint = 0;
@@ -160,34 +164,36 @@ void AvcNav::resetWaypoints() {
 }
 
 void AvcNav::startSampling(AvcLcd *lcd) {
-  if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || sampling) {
+  if (sampling) {
     return;
   }
   waypointSamplingIndex++;
   numWaypointsSet++;
+  AvcEeprom::setWayCount(numWaypointsSet);
   sampling = true;
   samples = 0;
-  waypoints[waypointSamplingIndex] = new AvcGps();
+  tempWaypoint = new AvcGps();
   lcd->setMode(lcd->SAMPLING);
 }
 
 float AvcNav::crossTrackError () {
-  AvcGps *start = waypoints[(nextWaypoint - 1 + WAYPOINT_COUNT) % WAYPOINT_COUNT];
-  AvcGps *dest = waypoints[nextWaypoint];
+  long sLat, sLon, dLat, dLon;
+  AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
+  byte count = numWaypointsSet;
+  AvcEeprom::readLatLon ((nextWaypoint - 1 + count) % count, &sLat, &sLon);
   int multiplier = 1;
-  float plusminus = ((dest->getLatitude() - start->getLatitude()) *
-      (start->getLongitude() - getLongitude()) - (start->getLatitude() - getLatitude()) *
-      (dest->getLongitude() - start->getLongitude()));
+  // this will tell me if the car is on the right or left of the line
+  float plusminus = ((dLat - sLat) * (sLon - getLongitude()) - (sLat - getLatitude()) * (dLon - sLon));
   if (plusminus < 0) {
     multiplier = -1;
   }
-  float a = TinyGPS::distance_between(toFloat(start->getLatitude()), 0.0f, toFloat(dest->getLatitude()), toFloat(start->getLongitude() - dest->getLongitude()));
-  float b = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(dest->getLatitude()), toFloat(getLongitude() - dest->getLongitude()));
-  float c = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(start->getLatitude()), toFloat(getLongitude() - start->getLongitude()));
+  float a = TinyGPS::distance_between(toFloat(sLat), 0.0f, toFloat(dLat), toFloat(sLon - dLon));
+  float b = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(dLat), toFloat(getLongitude() - dLon));
+  float c = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(sLat), toFloat(getLongitude() - sLon));
   
   float cosc = (sq(a) + sq(b) - sq(c)) / (2 * a * b);
   float C = acos(cosc);
   float d = sin(C) * b;
-  return multiplier * d;
+  return float(multiplier) * d;
 }
 

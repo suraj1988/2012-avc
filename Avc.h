@@ -5,7 +5,7 @@
 #include <Streaming.h>
 
 #define MAX_SAMPLES 50
-#define WAYPOINT_COUNT 4
+//#define WAYPOINT_COUNT 4
 #define WAYPOINT_RADIUS 3.0 // meters
 
 #define STEERING_CENTER 180

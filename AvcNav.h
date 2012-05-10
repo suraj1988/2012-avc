@@ -8,6 +8,7 @@
 #include "Avc.h"
 #include "AvcPid.h"
 #include "AvcLcd.h"
+#include "Eeprom.h"
 
 #define BUF_SIZE 256
 #define NUM_ELEMENTS 8
@@ -22,7 +23,8 @@ class AvcNav {
   float speed;
   boolean waasLock;
   int heading;
-  AvcGps *waypoints[WAYPOINT_COUNT];
+//  AvcGps *waypoints[WAYPOINT_COUNT];
+  AvcGps *tempWaypoint;
   int waypointSamplingIndex;
   int numWaypointsSet;
   int nextWaypoint;
@@ -34,8 +36,10 @@ class AvcNav {
   boolean reorienting;
 
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
-  inline int getHeadingTo (AvcGps *dest) {
-    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(dest->getLatitude()), toFloat(dest->getLongitude() - longitude));
+  inline int getHeadingToWaypoint () {
+    long lat,lon;
+    AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
+    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(lat), toFloat(lon - longitude));
   }
   inline boolean checkHdop() {return hdop < 2.0;}
 
@@ -76,9 +80,11 @@ public:
   inline void printWaypoints() {
     if (numWaypointsSet > 0) {
       for (int ii = 0; ii < numWaypointsSet; ii++) {
+        long lat, lon;
+        AvcEeprom::readLatLon (ii, &lat, &lon);
         Serial << 
-            waypoints[ii]->getLatitude() << "\t" <<
-            waypoints[ii]->getLongitude() << "\t";
+            lat << "\t" <<
+            lon << "\t";
       }
       Serial << endl;
     }
