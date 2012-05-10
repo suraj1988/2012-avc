@@ -9,11 +9,13 @@
 #include <Streaming.h>
 #include "AvcPid.h"
 #include <math.h>
-#include "AvcNav.h"
 #include "AvcGps.h"
-#include "Avc.h"
 #include "AvcImu.h"
-
+#include <LiquidCrystal.h>
+#include "AvcLcd.h"
+#include "AvcNav.h"
+#include "Avc.h"
+#include <EEPROM.h>
 
 // booleans
 #define PRINT_BUTTON_STATUS 0
@@ -21,7 +23,6 @@
 #define LOG_WAYPOINTS 0
 // for testing pid in a straight line
 #define DRIVE_TO_POINT 0
-#define COMPASS_ONLY 1
 
 #define GPS_LED 8
 
@@ -56,6 +57,7 @@ SoftwareSerial navSerial(RXPIN, TXPIN);
 //Gps location;
 AvcNav *nav;
 AvcImu *imu;
+AvcLcd *lcd;
 
 void setup()
 {
@@ -83,10 +85,11 @@ void setup()
 //  distances();
 nav = new AvcNav();
 imu = new AvcImu();
+lcd = new AvcLcd();
 }
 
-void loop()
-{
+void loop() {
+  lcd->display();
   while (navSerial.available()) {
     byte c = navSerial.read();
     imu->parse(c);
@@ -94,7 +97,7 @@ void loop()
       if (imu->isValid()) {
         nav->update(imu);
         if (nav->isSampling()) {
-          nav->sample();
+          nav->sample(lcd);
         }
       }
       imu->reset();
@@ -102,7 +105,7 @@ void loop()
     }
   }
   if (!nav->isSampling()) {
-    checkButtons(nav);
+    checkButtons(nav, lcd);
     nav->steer();
     nav->printWaypoints();
   }

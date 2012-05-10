@@ -3,10 +3,11 @@
 
 #include "Arduino.h"
 #include <Streaming.h>
-#include "AvcGps.h"
 #include <TinyGPS.h>
 #include "AvcImu.h"
 #include "Avc.h"
+#include "AvcPid.h"
+#include "AvcLcd.h"
 
 #define BUF_SIZE 256
 #define NUM_ELEMENTS 8
@@ -17,6 +18,7 @@ class AvcNav {
   float hdop;
   float distanceTraveled;
   unsigned long fixTime;
+  unsigned long previousFixTime;
   float speed;
   boolean waasLock;
   int heading;
@@ -27,15 +29,26 @@ class AvcNav {
   int bestKnownHeading;
   boolean sampling;
   int samples;
+  AvcPid pid;
+  boolean goodHdop;
+  boolean reorienting;
+
+  inline float toFloat (long fixed) {return fixed / 1000000.0;}
+  inline int getHeadingTo (AvcGps *dest) {
+    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(dest->getLatitude()), toFloat(dest->getLongitude() - longitude));
+  }
+  inline boolean checkHdop() {return hdop < 2.0;}
+
+  float crossTrackError ();
+  void pickWaypoint();
 
 public:
   AvcNav ();
-  int pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoints);
   void steer ();
   void update (AvcImu*);
-  void sample ();
+  void sample (AvcLcd*);
   void resetWaypoints();
-  void startSampling();
+  void startSampling(AvcLcd*);
   
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
@@ -45,10 +58,6 @@ public:
   inline float getSpeed() {return speed;}
   inline boolean hasWaasLock() {return waasLock;}
   inline int getHeading() {return heading;}
-  inline float toFloat (long fixed) {return fixed / 1000000.0;}
-  inline int getHeadingTo (AvcGps *dest) {
-    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(dest->getLatitude()), toFloat(dest->getLongitude() - longitude));
-  }
   inline boolean isSampling() {return sampling;}
 
   inline void print() {
@@ -74,5 +83,6 @@ public:
       Serial << endl;
     }
   }
+  
 };
 #endif

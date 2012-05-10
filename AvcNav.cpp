@@ -1,6 +1,6 @@
 #include "AvcNav.h"
 
-AvcNav::AvcNav () {
+AvcNav::AvcNav (): pid() {
   latitude = 0;
   longitude = 0;
   hdop = 0;
@@ -15,33 +15,50 @@ AvcNav::AvcNav () {
   bestKnownHeading = 0;
   sampling = false;
   samples = 0;
+  goodHdop = true;
+  reorienting = false;
 }
 
-int AvcNav::pickWaypoint(AvcGps *waypoints[], int nextWaypoint, int totalWaypoints) {
-  if (totalWaypoints >= 2) {
+void AvcNav::pickWaypoint() {
+  if (numWaypointsSet >= 2) {
     float distanceFromWaypoint = TinyGPS::distance_between(toFloat(latitude), 0.0f, 
         toFloat(waypoints[nextWaypoint]->getLatitude()), toFloat(waypoints[nextWaypoint]->getLongitude() - longitude));
     if (distanceFromWaypoint < WAYPOINT_RADIUS) {
-      nextWaypoint = (nextWaypoint + 1) % totalWaypoints;
+      nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
     }
   }
-  return nextWaypoint;
 }
 
 void AvcNav::steer () {
+  pickWaypoint();
   if (numWaypointsSet > 0) {
     int h = getHeadingTo(waypoints[nextWaypoint]);
     if (h >= 0) {
       bestKnownHeading = h;
     }
-  }
-  int headingOffset = (heading - bestKnownHeading + 360) % 360;
-  int steering = STEERING_CENTER;
-  if(headingOffset >= 180) {
-    steering = map(headingOffset, 180, 360, MAX_STEERING, STEERING_CENTER);
   } else {
-    steering = map(headingOffset, 180, 0, MIN_STEERING, STEERING_CENTER);
+    bestKnownHeading = 0;
   }
+  float cte = crossTrackError();
+  byte pidOffset = pid.compute(cte, (fixTime - previousFixTime)/1000.0, speed);
+  int steering = STEERING_CENTER;
+  if (!goodHdop || reorienting || COMPASS_ONLY) {
+    int headingOffset = (heading - bestKnownHeading + 360) % 360;
+    if(headingOffset >= 180) {
+      steering = map(headingOffset, 180, 360, MAX_STEERING, STEERING_CENTER);
+    } else {
+      steering = map(headingOffset, 180, 0, MIN_STEERING, STEERING_CENTER);
+    }
+    goodHdop = checkHdop();
+  } else { // use pid
+    if(pidOffset >= 0) {
+      steering = map(pidOffset, -100, 0, MAX_STEERING, STEERING_CENTER);
+    } else {
+      steering = map(pidOffset, 100, 0, MIN_STEERING, STEERING_CENTER);
+    }
+    goodHdop = checkHdop();
+  }
+
   analogWrite(SERVO_PIN, steering);
 //  if (numWaypointsSet >= 2 || DRIVE_TO_POINT == 1) {
 //    if (location.hasWaypointChanged()) {
@@ -111,15 +128,20 @@ void AvcNav::update (AvcImu *imu) {
   longitude = imu->getLongitude();
   hdop = imu->getHdop();
   distanceTraveled = imu->getDistanceTraveled();
+  previousFixTime = fixTime;
   fixTime = imu->getFixTime();
   speed = imu->getSpeed();
   waasLock = imu->hasWaasLock();
   heading = imu->getHeading();
 }
 
-void AvcNav::sample () {
+void AvcNav::sample (AvcLcd *lcd) {
+  if (fixTime != previousFixTime) {
+    return;
+  }
   if (samples >= MAX_SAMPLES) {
     sampling = false;
+    lcd->resetMode();
     return;
   }
   samples++;
@@ -137,7 +159,7 @@ void AvcNav::resetWaypoints() {
   sampling = false;
 }
 
-void AvcNav::startSampling() {
+void AvcNav::startSampling(AvcLcd *lcd) {
   if (waypointSamplingIndex == WAYPOINT_COUNT - 1 || sampling) {
     return;
   }
@@ -146,4 +168,26 @@ void AvcNav::startSampling() {
   sampling = true;
   samples = 0;
   waypoints[waypointSamplingIndex] = new AvcGps();
+  lcd->setMode(lcd->SAMPLING);
 }
+
+float AvcNav::crossTrackError () {
+  AvcGps *start = waypoints[(nextWaypoint - 1 + WAYPOINT_COUNT) % WAYPOINT_COUNT];
+  AvcGps *dest = waypoints[nextWaypoint];
+  int multiplier = 1;
+  float plusminus = ((dest->getLatitude() - start->getLatitude()) *
+      (start->getLongitude() - getLongitude()) - (start->getLatitude() - getLatitude()) *
+      (dest->getLongitude() - start->getLongitude()));
+  if (plusminus < 0) {
+    multiplier = -1;
+  }
+  float a = TinyGPS::distance_between(toFloat(start->getLatitude()), 0.0f, toFloat(dest->getLatitude()), toFloat(start->getLongitude() - dest->getLongitude()));
+  float b = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(dest->getLatitude()), toFloat(getLongitude() - dest->getLongitude()));
+  float c = TinyGPS::distance_between(toFloat(getLatitude()), 0.0f, toFloat(start->getLatitude()), toFloat(getLongitude() - start->getLongitude()));
+  
+  float cosc = (sq(a) + sq(b) - sq(c)) / (2 * a * b);
+  float C = acos(cosc);
+  float d = sin(C) * b;
+  return multiplier * d;
+}
+

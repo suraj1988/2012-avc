@@ -16,4 +16,6 @@
 #define SET_WAYPOINT_PIN 8
 #define RESET_BUTTON_PIN 7
 
+#define COMPASS_ONLY 1
+
 #endif

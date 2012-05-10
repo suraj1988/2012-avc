@@ -13,7 +13,7 @@ class AvcPid {
   
 public:
   // time is in seconds, speed in meters / second
-  float compute (float error, float timeDelta, float speed);
+  int compute (float error, float timeDelta, float speed);
 };
 
 #endif
