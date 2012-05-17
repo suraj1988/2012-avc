@@ -20,6 +20,9 @@ void AvcImu::parse (char c) {
   switch (c) {
     case '\n':
       objectComplete = true;
+#if LOG_IMU
+      print();
+#endif
       return;
     case '\r': {
       buf[charCount-1] = NULL;

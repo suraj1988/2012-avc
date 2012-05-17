@@ -5,6 +5,7 @@
 #include <Streaming.h>
 #include "AvcGps.h"
 #include <TinyGPS.h>
+#include "Avc.h"
 
 #define BUF_SIZE 256
 #define NUM_ELEMENTS 8
@@ -39,7 +40,7 @@ public:
   inline float getSpeed() {return speed;}
   inline boolean hasWaasLock() {return waasLock;}
   inline int getHeading() {return heading;}
-
+#if LOG_IMU
   inline void print() {
     Serial << "IMU" << "\t" <<
         latitude << "\t" <<
@@ -52,5 +53,6 @@ public:
         heading <<
         endl;
   }
+#endif
 };
 #endif

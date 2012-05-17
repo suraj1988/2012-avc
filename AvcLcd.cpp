@@ -9,11 +9,6 @@ AvcLcd::AvcLcd (): lcd(0) {
   mode = NONE;
 }
 
-void AvcLcd::printHello () {
-  lcd.print("hello, LCD world!");
-  lcd.setBacklight(HIGH);
-}
-
 void AvcLcd::setMode (Mode m) {
   previousMode = mode;
   mode = m;
@@ -57,3 +52,30 @@ void AvcLcd::resetMode () {
   display();
 }
 
+void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh) {
+  if (refresh) {
+    lcd.clear();
+  }
+  lcd << _FLOAT(lat/1000000.0, 6);
+  lcd.setCursor(0, 1);
+  lcd << _FLOAT(lon/1000000.0, 6);
+  lcd.setCursor(12, 0);
+  lcd << _FLOAT(hdop, 2);
+  lcd.setBacklight(HIGH);
+}
+
+void AvcLcd::printStartSampling(byte waypoints) {
+  lcd.clear();
+  lcd << "START SAMPLING?";
+  lcd.setCursor(0, 1);
+  lcd << "WAYPOINTS: " << waypoints;
+  lcd.setBacklight(HIGH);
+}
+
+void AvcLcd::askReset(byte waypoints) {
+  lcd.clear();
+  lcd << "RESET WAYPOINTS?";
+  lcd.setCursor(0, 1);
+  lcd << "WAYPOINTS: " << waypoints;
+  lcd.setBacklight(HIGH);
+}

@@ -2,7 +2,8 @@
 #define AvcPid_h
 
 #include "Arduino.h"
-#include <math.h>
+#include "Avc.h"
+#include <Streaming.h>
 
 class AvcPid {
   // pi = 180 degrees

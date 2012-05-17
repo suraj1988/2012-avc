@@ -8,7 +8,8 @@
 #include "Avc.h"
 #include "AvcPid.h"
 #include "AvcLcd.h"
-#include "Eeprom.h"
+#include "AvcEeprom.h"
+#include "Logger.h"
 
 #define BUF_SIZE 256
 #define NUM_ELEMENTS 8
@@ -34,6 +35,12 @@ class AvcNav {
   AvcPid pid;
   boolean goodHdop;
   boolean reorienting;
+  long sLat, sLon, dLat, dLon;
+  float odometerSpeed;
+  unsigned long previousOdometerCount;
+  unsigned long previousOdometerMillis;
+  boolean gpsUpdated;
+  byte previousPidOffset;
 
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
   inline int getHeadingToWaypoint () {
@@ -41,7 +48,7 @@ class AvcNav {
     AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
     return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(lat), toFloat(lon - longitude));
   }
-  inline boolean checkHdop() {return hdop < 2.0;}
+  inline boolean checkHdop() {return hdop > .0001 && hdop < 2.0;}
 
   float crossTrackError ();
   void pickWaypoint();
@@ -53,6 +60,7 @@ public:
   void sample (AvcLcd*);
   void resetWaypoints();
   void startSampling(AvcLcd*);
+  void updateSpeed(float);
   
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
@@ -63,7 +71,10 @@ public:
   inline boolean hasWaasLock() {return waasLock;}
   inline int getHeading() {return heading;}
   inline boolean isSampling() {return sampling;}
+  inline byte getNumWaypoints() {return numWaypointsSet;}
+  inline float getOdometerSpeed() {return odometerSpeed;}
 
+#if LOG_NAV
   inline void print() {
     Serial << "NAV" << "\t" <<
         latitude << "\t" <<
@@ -72,11 +83,13 @@ public:
         distanceTraveled << "\t" <<
         fixTime << "\t" <<
         speed << "\t" <<
+        odometerSpeed << "\t" <<
         waasLock << "\t" <<
         heading <<
         endl;
   }
-  
+#endif
+
   inline void printWaypoints() {
     if (numWaypointsSet > 0) {
       for (int ii = 0; ii < numWaypointsSet; ii++) {
