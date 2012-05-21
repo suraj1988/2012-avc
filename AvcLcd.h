@@ -6,10 +6,11 @@
 #include <LiquidCrystal.h>
 #include <Wire.h>
 #include "Avc.h"
+#include "AvcEeprom.h"
 
 class AvcLcd {
 public:
-  enum Mode {NONE, SAMPLING};
+  enum Mode {NONE, SAMPLING, WAYPOINTS};
 
   AvcLcd();
   void printHello();
@@ -19,6 +20,8 @@ public:
   void printGps(long,long,float,boolean);
   void printStartSampling(byte waypoints);
   void askReset(byte waypoints);
+  void askWaypointSlideshow(byte waypoints);
+  inline Mode getMode () {return mode;}
   
 private:
   LiquidCrystal lcd;
@@ -27,7 +30,9 @@ private:
   boolean init;
   boolean backlit;
   Mode previousMode;
+  byte waypointIndex;
 
   void sampling();
+  void waypointSlideshow ();
 };
 #endif

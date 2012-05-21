@@ -45,6 +45,7 @@ void AvcMenu::checkButtons (boolean refresh) {
   if (button == MENU_SCROLL_PIN) {
     currentMenu = (currentMenu + 1) % total;
     refresh = true;
+    lcd->setMode(lcd->NONE);
   } else if (button == MENU_SELECT_PIN) {
     switch(currentMenu) {
       case 1:
@@ -53,10 +54,13 @@ void AvcMenu::checkButtons (boolean refresh) {
       case 2:
         nav->resetWaypoints();
         break;
+      case 3:
+        lcd->setMode(lcd->WAYPOINTS);
+        break;
     }
     refresh = true;
   }
-  if (refresh || (millis() - refreshTime) > 500) {
+  if (refresh || (millis() - refreshTime) > 500 && lcd->getMode() == lcd->NONE) {
     refreshTime = millis();
     switch(currentMenu) {
       case 0:
@@ -70,6 +74,11 @@ void AvcMenu::checkButtons (boolean refresh) {
       case 2:
         if (refresh) {
           lcd->askReset(nav->getNumWaypoints());
+        }
+        break;
+      case 3:
+        if (refresh) {
+          lcd->askWaypointSlideshow(nav->getNumWaypoints());
         }
         break;
     }

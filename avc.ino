@@ -13,10 +13,6 @@
 #include <EEPROM.h>
 #include "AvcMenu.h"
 
-#define HALL_SENSOR_PIN 2
-
-#define RXPIN 4
-#define TXPIN 5
 
 SoftwareSerial navSerial(RXPIN, TXPIN);
 AvcNav *nav;
@@ -29,6 +25,7 @@ volatile unsigned long previousOdometerMicros = 0;
 volatile unsigned long odometerMicrosDelta = 0;
 boolean refreshLcd = false;
 unsigned long previousTime = 0;
+unsigned long fiftyHertzTime = 0;
 
 void setup()
 {
@@ -52,21 +49,28 @@ void setup()
 void loop() {
   while (navSerial.available()) {
     byte c = navSerial.read();
-//    Serial.write(c);
     imu->parse(c);
     if (imu->isComplete()) {
-//      Serial << "complete" << endl;
       if (imu->isValid()) {
-//        Serial << "valid" << endl;
-        nav->update(imu);
-        if (nav->isSampling()) {
-          nav->sample(lcd);
-          refreshLcd = true;
-        } else {
+        switch (imu->getMode()) {
+          case AvcImu::COMPASS:
+            nav->updateCompass(imu);
+            break;
+          case AvcImu::GPS:
+            nav->updateGps(imu);
+            if (nav->isSampling()) {
+              nav->sample(lcd);
+              refreshLcd = true;
+            }
+            break;
+          case AvcImu::IMU:
+            nav->update(imu);
+            break;
+        }
+        if (!nav->isSampling()) {
           if (odometerMicrosDelta < 0) {
             odometerMicrosDelta = 4294967295 + odometerMicrosDelta;
           }
-          nav->updateSpeed(odometerMicrosDelta * .000001);
           nav->steer();
 #if LOG_NAV
           nav->print();
@@ -77,7 +81,12 @@ void loop() {
       break;
     }
   }
-//  Serial << nav->getOdometerSpeed() << endl;
+  if (millis() - fiftyHertzTime > 20) {
+    fiftyHertzTime = millis();
+    if (!nav->isSampling()) {
+      nav->updateSpeed(odometerMicrosDelta * .000001);
+    }
+  }
   if (millis() - previousTime > 1000 / LOOP_SPEED && nav->getOdometerSpeed() < 1) {
     previousTime = millis();
     lcd->display();

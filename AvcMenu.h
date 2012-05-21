@@ -7,7 +7,7 @@
 #include "AvcNav.h"
 
 class AvcMenu {
-  const static byte total = 3;
+  const static byte total = 4;
   AvcLcd *lcd;
   AvcNav *nav;
   byte currentMenu;

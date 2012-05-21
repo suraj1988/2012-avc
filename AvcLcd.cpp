@@ -7,6 +7,8 @@ AvcLcd::AvcLcd (): lcd(0) {
   init = true;
   backlit = false;
   mode = NONE;
+  previousMode = NONE;
+  waypointIndex = 0;
 }
 
 void AvcLcd::setMode (Mode m) {
@@ -22,6 +24,9 @@ void AvcLcd::display () {
   switch(mode) {
     case SAMPLING:
       sampling();
+      break;
+    case WAYPOINTS:
+      waypointSlideshow();
       break;
   }
 }
@@ -56,6 +61,7 @@ void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh) {
   if (refresh) {
     lcd.clear();
   }
+  lcd.home();
   lcd << _FLOAT(lat/1000000.0, 6);
   lcd.setCursor(0, 1);
   lcd << _FLOAT(lon/1000000.0, 6);
@@ -66,6 +72,7 @@ void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh) {
 
 void AvcLcd::printStartSampling(byte waypoints) {
   lcd.clear();
+  lcd.home();
   lcd << "START SAMPLING?";
   lcd.setCursor(0, 1);
   lcd << "WAYPOINTS: " << waypoints;
@@ -74,8 +81,41 @@ void AvcLcd::printStartSampling(byte waypoints) {
 
 void AvcLcd::askReset(byte waypoints) {
   lcd.clear();
+  lcd.home();
   lcd << "RESET WAYPOINTS?";
   lcd.setCursor(0, 1);
   lcd << "WAYPOINTS: " << waypoints;
   lcd.setBacklight(HIGH);
 }
+
+void AvcLcd::askWaypointSlideshow(byte waypoints) {
+  lcd.clear();
+  lcd << "SHOW WAYPOINTS?";
+  lcd.setCursor(0, 1);
+  lcd << "WAYPOINTS: " << waypoints;
+  lcd.setBacklight(HIGH);
+}
+
+void AvcLcd::waypointSlideshow () {
+  if (init) {
+    lcd.clear();
+    init = false;
+    time = millis();
+    waypointIndex = 0;
+    lcd.setBacklight(HIGH);
+  }
+  if ((millis() - time) > 1000) {
+    byte count = AvcEeprom::getWayCount();
+    long lat, lon;
+    AvcEeprom::readLatLon (waypointIndex, &lat, &lon);
+    lcd.home();
+    lcd << _FLOAT(lat/1000000.0, 6);
+    lcd.setCursor(0, 1);
+    lcd << _FLOAT(lon/1000000.0, 6);
+    lcd.setCursor(12, 0);
+    lcd << waypointIndex;
+    time = millis();
+    waypointIndex = (waypointIndex + 1) % count;
+  } 
+}
+

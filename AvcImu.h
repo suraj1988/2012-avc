@@ -8,9 +8,12 @@
 #include "Avc.h"
 
 #define BUF_SIZE 256
-#define NUM_ELEMENTS 8
 
 class AvcImu {
+public:
+  enum Mode {IMU, GPS, COMPASS};
+
+private:
   long latitude;
   long longitude;
   float hdop;
@@ -24,6 +27,10 @@ class AvcImu {
   byte charCount;
   boolean invalid;
   boolean objectComplete;
+  Mode mode;
+  byte xOffset;
+  byte yOffset;
+  byte zOffset;
 
 public:
   AvcImu ();
@@ -40,6 +47,7 @@ public:
   inline float getSpeed() {return speed;}
   inline boolean hasWaasLock() {return waasLock;}
   inline int getHeading() {return heading;}
+  inline Mode getMode() {return mode;}
 #if LOG_IMU
   inline void print() {
     Serial << "IMU" << "\t" <<

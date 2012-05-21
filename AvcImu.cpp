@@ -40,28 +40,71 @@ void AvcImu::parse (char c) {
       {
         switch (convertCount) {
           case 0:
-            latitude = atol(pch);
+            if (strcmp(pch, "COMP") == 0) {
+              mode = COMPASS;
+            } else if (strcmp(pch, "GPS") == 0) {
+              mode = GPS;
+            } else {
+              mode = IMU;
+              latitude = atol(pch);
+            }
             break;
           case 1:
-            longitude = atol(pch);
+            if (mode == COMPASS) {
+              heading = atoi(pch);
+            } else if (mode == GPS) {
+              latitude = atol(pch);
+            } else if (mode == IMU) {
+              longitude = atol(pch);
+            }
             break;
           case 2:
-            hdop = atof(pch);
+            if (mode == COMPASS) {
+              xOffset = atoi(pch);
+            } else if (mode == GPS) {
+              longitude = atol(pch);
+            } else if (mode == IMU) {
+              hdop = atof(pch);
+            }
             break;
           case 3:
-            distanceTraveled = atof(pch);
+            if (mode == COMPASS) {
+              yOffset = atoi(pch);
+            } else if (mode == GPS) {
+              hdop = atof(pch);
+            } else if (mode == IMU) {
+              distanceTraveled = atof(pch);
+            }
             break;
           case 4:
-            fixTime = atol(pch);
+            if (mode == COMPASS) {
+              zOffset = atoi(pch);
+            } else if (mode == GPS) {
+              distanceTraveled = atof(pch);
+            } else if (mode == IMU) {
+              fixTime = atol(pch);
+            }
             break;
           case 5:
-            speed = atof(pch);
+            if (mode == GPS) {
+              fixTime = atol(pch);
+            } else if (mode == IMU) {
+              speed = atof(pch);
+            }
             break;
           case 6:
-            waasLock = atoi(pch);
+            if (mode == GPS) {
+              speed = atof(pch);
+            } else if (mode == IMU) {
+              waasLock = atoi(pch);
+            }
             break;
           case 7:
-            heading = atoi(pch);
+            if (mode == GPS) {
+              waasLock = atoi(pch);
+            } else if (mode == IMU) {
+              heading = atoi(pch);
+            }
             break;
         }
         convertCount++;
@@ -88,5 +131,9 @@ void AvcImu::reset () {
   charCount = 0;
   invalid  = false;
   objectComplete = false;
+  mode = IMU;
+  xOffset = 0;
+  yOffset = 0;
+  zOffset = 0;
 }
 

@@ -41,6 +41,8 @@ class AvcNav {
   unsigned long previousOdometerMillis;
   boolean gpsUpdated;
   byte previousPidOffset;
+  byte pidOffset;
+  byte previousSteering;
 
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
   inline int getHeadingToWaypoint () {
@@ -61,6 +63,8 @@ public:
   void resetWaypoints();
   void startSampling(AvcLcd*);
   void updateSpeed(float);
+  void updateCompass(AvcImu*);
+  void updateGps(AvcImu*);
   
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}

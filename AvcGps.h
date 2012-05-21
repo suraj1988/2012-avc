@@ -2,8 +2,6 @@
 #define AvcGps_h
 
 #include "Arduino.h"
-#include <Streaming.h>
-#include "Avc.h"
 
 class AvcGps {
   long latitude;

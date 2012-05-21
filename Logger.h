@@ -4,10 +4,6 @@
 #include <Streaming.h>
 #include "Avc.h"
 
-#define LOG_CTE 0
-#define PRINT_DATA 0
-#define PRINT_HEADINGS 0
-
 class Logger {
   public:
 #if LOG_HEADING

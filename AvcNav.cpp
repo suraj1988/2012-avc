@@ -22,19 +22,25 @@ AvcNav::AvcNav (): pid() {
   previousOdometerMillis = 0;
   gpsUpdated = false;
   previousPidOffset = 0;
+  previousSteering = STEERING_CENTER;
   if (numWaypointsSet > 0) {
     AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
     if (numWaypointsSet > 1) {
       AvcEeprom::readLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
     }
   }
+  pidOffset = 0;
 }
 
 void AvcNav::pickWaypoint() {
   if (numWaypointsSet >= 2) {
     float distanceFromWaypoint = TinyGPS::distance_between(toFloat(latitude), 0.0f, 
         toFloat(dLat), toFloat(dLon - longitude));
-    if (distanceFromWaypoint < WAYPOINT_RADIUS) {
+    float distanceBetweenWaypoints = TinyGPS::distance_between(toFloat(sLat), 0.0f, 
+        toFloat(dLat), toFloat(dLon - sLon));
+    float distanceFromStartWaypoint = TinyGPS::distance_between(toFloat(sLat), 0.0f, 
+        toFloat(latitude), toFloat(longitude - sLon));
+    if (distanceFromWaypoint < WAYPOINT_RADIUS || distanceFromStartWaypoint > distanceBetweenWaypoints) {
       nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
       sLat = dLat;
       sLon = dLon;
@@ -56,13 +62,13 @@ void AvcNav::steer () {
   }
   float cte = crossTrackError();
   // there might be a problem with fixtime and previous fix time if this code runs a long time. or maybe even a short time.
-  byte pidOffset = 0;
   if (gpsUpdated) {
     pidOffset = pid.compute(cte, (fixTime - previousFixTime)/1000.0, odometerSpeed);
     previousPidOffset = pidOffset;
   }
   int steering = STEERING_CENTER;
-  if (!goodHdop || reorienting || COMPASS_ONLY || odometerSpeed < 1) {
+  if (!goodHdop || reorienting || COMPASS_ONLY || odometerSpeed < 1 || DISTANCE_FROM_LINE_CORRECTION) {
+    pidOffset = 0;
     int headingOffset = (heading - bestKnownHeading + 360) % 360;
     if (abs(headingOffset) < 30) {
       reorienting = false;
@@ -72,6 +78,28 @@ void AvcNav::steer () {
     } else {
       steering = map(headingOffset, 180, 0, MIN_STEERING, STEERING_CENTER);
     }
+#if DISTANCE_FROM_LINE_CORRECTION
+    int adj = 0;
+    if (cte > 0) {
+      adj = int(min(10, int(cte * 5.0)));
+    } else {
+      adj = int(max(-10, int(cte * 5.0)));
+    }
+//  Serial << bestKnownHeading << "\t";
+//  Serial << heading << "\t";
+//  Serial << cte << "\t";
+//  Serial << adj << "\t";
+//  Serial << steering - STEERING_CENTER << "\t";
+    steering = constrain(steering + adj, MIN_STEERING, MAX_STEERING);
+//  Serial << steering - STEERING_CENTER << endl;
+#endif
+    const byte maxSteeringDiff = 5;
+    if (steering - previousSteering > maxSteeringDiff && steering > STEERING_CENTER) {
+      steering = previousSteering + maxSteeringDiff;
+    } else if (steering - previousSteering < -maxSteeringDiff && steering < STEERING_CENTER) {
+      steering = previousSteering - maxSteeringDiff;
+    }
+    previousSteering = steering;
     goodHdop = checkHdop();
   } else { // use pid
     if (!gpsUpdated) {
@@ -82,6 +110,13 @@ void AvcNav::steer () {
     } else {
       steering = map(pidOffset, 100, 0, MIN_STEERING, STEERING_CENTER);
     }
+    const byte maxSteeringDiff = 2;
+    if (steering - previousSteering > maxSteeringDiff) {
+      steering = previousSteering + maxSteeringDiff;
+    } else if (steering - previousSteering < -maxSteeringDiff) {
+      steering = previousSteering - maxSteeringDiff;
+    }
+    previousSteering = steering;
     goodHdop = checkHdop();
   }
 #if LOG_HEADING
@@ -94,17 +129,26 @@ void AvcNav::steer () {
 void AvcNav::update (AvcImu *imu) {
   gpsUpdated = false;
   if (imu->getHdop() > .0001 && imu->getFixTime() != fixTime) {
-    latitude = imu->getLatitude();
-    longitude = imu->getLongitude();
-    hdop = imu->getHdop();
-    distanceTraveled = imu->getDistanceTraveled();
-    previousFixTime = fixTime;
-    fixTime = imu->getFixTime();
-    speed = imu->getSpeed();
-    waasLock = imu->hasWaasLock();
-    gpsUpdated = true;
+    updateGps(imu);
   }
+  updateCompass(imu);
+}
+
+void AvcNav::updateCompass (AvcImu *imu) {
+  gpsUpdated = false;
   heading = imu->getHeading();
+}
+
+void AvcNav::updateGps (AvcImu *imu) {
+  latitude = imu->getLatitude();
+  longitude = imu->getLongitude();
+  hdop = imu->getHdop();
+  distanceTraveled = imu->getDistanceTraveled();
+  previousFixTime = fixTime;
+  fixTime = imu->getFixTime();
+  speed = imu->getSpeed();
+  waasLock = imu->hasWaasLock();
+  gpsUpdated = true;
 }
 
 void AvcNav::sample (AvcLcd *lcd) {
