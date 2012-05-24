@@ -21,8 +21,16 @@ public:
   void printStartSampling(byte waypoints);
   void askReset(byte waypoints);
   void askWaypointSlideshow(byte waypoints);
+  void askSetMaxSpeed(float maxSpeed, boolean refresh);
   inline Mode getMode () {return mode;}
-  
+  static inline float getPotSpeed(int iterations) {
+    int maxPI = 0;
+//    for (int ii = 0; ii < iterations; ii++) {
+      maxPI = max(pulseIn(SPEED_CONTROL_PIN, HIGH), maxPI);
+//    }
+    return (maxPI - 1500.0) / 500.0;
+  }
+
 private:
   LiquidCrystal lcd;
   Mode mode;

@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <TinyGPS.h>
-#include <SoftwareSerial.h>
 #include "Logger.h"
 #include <Streaming.h>
 #include "AvcPid.h"
@@ -12,9 +11,13 @@
 #include "Avc.h"
 #include <EEPROM.h>
 #include "AvcMenu.h"
+#include <SoftwareSerial.h>
+#include <Servo.h>
 
+#if !USE_SERVO_LIBRARY
+//  SoftwareSerial navSerial(RXPIN, TXPIN);
+#endif
 
-SoftwareSerial navSerial(RXPIN, TXPIN);
 AvcNav *nav;
 AvcImu *imu;
 AvcLcd *lcd;
@@ -30,7 +33,9 @@ unsigned long fiftyHertzTime = 0;
 void setup()
 {
   Serial.begin(57600);
+#if !USE_SERVO_LIBRARY
   navSerial.begin(14400);
+#endif
   pinMode(SERVO_PIN, OUTPUT);
   pinMode(MENU_SELECT_PIN, INPUT);
   pinMode(MENU_SCROLL_PIN, INPUT);
@@ -47,8 +52,13 @@ void setup()
 }
 
 void loop() {
+#if USE_SERVO_LIBRARY
+  while (Serial.available()) {
+    byte c = Serial.read();
+#else
   while (navSerial.available()) {
     byte c = navSerial.read();
+#endif
     imu->parse(c);
     if (imu->isComplete()) {
       if (imu->isValid()) {
@@ -85,14 +95,22 @@ void loop() {
     fiftyHertzTime = millis();
     if (!nav->isSampling()) {
       nav->updateSpeed(odometerMicrosDelta * .000001);
+      nav->drive();
     }
   }
-  if (millis() - previousTime > 1000 / LOOP_SPEED && nav->getOdometerSpeed() < 1) {
-    previousTime = millis();
+  unsigned long mls = millis();
+  if ((mls - previousTime) > (1000 / LOOP_SPEED) && nav->getOdometerSpeed() < 1) {
+    previousTime = mls;
     lcd->display();
     if (!nav->isSampling()) {
       menu->checkButtons(refreshLcd);
       refreshLcd = false;
     }
   }  
+}
+
+void countRotations () {
+  rotations++;
+  odometerMicrosDelta = micros() - previousOdometerMicros;
+  previousOdometerMicros = micros();
 }

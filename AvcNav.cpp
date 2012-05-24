@@ -22,7 +22,7 @@ AvcNav::AvcNav (): pid() {
   previousOdometerMillis = 0;
   gpsUpdated = false;
   previousPidOffset = 0;
-  previousSteering = STEERING_CENTER;
+  previousSteering = SERVO_CENTER;
   if (numWaypointsSet > 0) {
     AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
     if (numWaypointsSet > 1) {
@@ -30,6 +30,13 @@ AvcNav::AvcNav (): pid() {
     }
   }
   pidOffset = 0;
+#if USE_SERVO_LIBRARY
+  steeringServo.attach(SERVO_PIN);
+  speedServo.attach(MOTOR_PIN);
+#endif
+  previousCte = 0;
+  maxSpeed = AvcEeprom::getMaxSpeed();
+  previousSpeed = 0;
 }
 
 void AvcNav::pickWaypoint() {
@@ -66,7 +73,7 @@ void AvcNav::steer () {
     pidOffset = pid.compute(cte, (fixTime - previousFixTime)/1000.0, odometerSpeed);
     previousPidOffset = pidOffset;
   }
-  int steering = STEERING_CENTER;
+  int steering = SERVO_CENTER;
   if (!goodHdop || reorienting || COMPASS_ONLY || odometerSpeed < 1 || DISTANCE_FROM_LINE_CORRECTION) {
     pidOffset = 0;
     int headingOffset = (heading - bestKnownHeading + 360) % 360;
@@ -74,41 +81,47 @@ void AvcNav::steer () {
       reorienting = false;
     }
     if(headingOffset >= 180) {
-      steering = map(headingOffset, 180, 360, MAX_STEERING, STEERING_CENTER);
+      steering = map(headingOffset, 180, 360, MAX_SERVO, SERVO_CENTER);
     } else {
-      steering = map(headingOffset, 180, 0, MIN_STEERING, STEERING_CENTER);
+      steering = map(headingOffset, 180, 0, MIN_SERVO, SERVO_CENTER);
     }
-#if DISTANCE_FROM_LINE_CORRECTION
+    byte maxSteeringDiff = percentOfServo(.05);
     int adj = 0;
+#if DISTANCE_FROM_LINE_CORRECTION
+    // if approaching the line then allow for faster steering
+    if (abs(cte) < abs(previousCte)) {
+      maxSteeringDiff = percentOfServo(.2);
+    } 
     if (cte > 0) {
-      adj = int(min(10, int(cte * 5.0)));
+      adj = int(min(percentOfServo(.1), int(cte * percentOfServo(.025))));
     } else {
-      adj = int(max(-10, int(cte * 5.0)));
+      adj = int(max(-percentOfServo(.1), int(cte * percentOfServo(.025))));
     }
+    previousCte = cte;
 //  Serial << bestKnownHeading << "\t";
 //  Serial << heading << "\t";
 //  Serial << cte << "\t";
 //  Serial << adj << "\t";
-//  Serial << steering - STEERING_CENTER << "\t";
-    steering = constrain(steering + adj, MIN_STEERING, MAX_STEERING);
-//  Serial << steering - STEERING_CENTER << endl;
+//  Serial << steering - SERVO_CENTER << "\t";
+    steering = constrain(steering + adj, MIN_SERVO, MAX_SERVO);
+//  Serial << steering - SERVO_CENTER << endl;
 #endif
-    const byte maxSteeringDiff = 5;
-    if (steering - previousSteering > maxSteeringDiff && steering > STEERING_CENTER) {
+    if (steering - previousSteering > maxSteeringDiff && steering > SERVO_CENTER) {
       steering = previousSteering + maxSteeringDiff;
-    } else if (steering - previousSteering < -maxSteeringDiff && steering < STEERING_CENTER) {
+    } else if (steering - previousSteering < -maxSteeringDiff && steering < SERVO_CENTER) {
       steering = previousSteering - maxSteeringDiff;
     }
     previousSteering = steering;
     goodHdop = checkHdop();
+#if !COMPASS_ONLY
   } else { // use pid
     if (!gpsUpdated) {
       pidOffset = previousPidOffset;
     }
     if(pidOffset <= 0) {
-      steering = map(pidOffset, -100, 0, MAX_STEERING, STEERING_CENTER);
+      steering = map(pidOffset, -100, 0, MAX_SERVO, SERVO_CENTER);
     } else {
-      steering = map(pidOffset, 100, 0, MIN_STEERING, STEERING_CENTER);
+      steering = map(pidOffset, 100, 0, MIN_SERVO, SERVO_CENTER);
     }
     const byte maxSteeringDiff = 2;
     if (steering - previousSteering > maxSteeringDiff) {
@@ -118,12 +131,21 @@ void AvcNav::steer () {
     }
     previousSteering = steering;
     goodHdop = checkHdop();
+#endif
   }
 #if LOG_HEADING
-  Logger::logHeadingData(dLat, dLon, latitude, longitude, heading, bestKnownHeading, hdop, steering - STEERING_CENTER);
+  logHeadingData(bestKnownHeading, hdop, steering - SERVO_CENTER, cte, adj, nextWaypoint);
 #endif
 
+#if USE_SERVO_LIBRARY
+#if GO_STRAIGHT
+  steeringServo.writeMicroseconds(SERVO_CENTER);
+#else
+  steeringServo.writeMicroseconds(steering);
+#endif
+#else
   analogWrite(SERVO_PIN, steering);
+#endif
 }
 
 void AvcNav::update (AvcImu *imu) {
@@ -218,4 +240,28 @@ float AvcNav::crossTrackError () {
 void AvcNav::updateSpeed(float timeDelta) {
   odometerSpeed = (.1222 / 2.0) / timeDelta;
 }
+
+void AvcNav::setSpeed(float fraction) {
+  if (abs(previousSpeed - fraction) > .0001) {
+    previousSpeed = fraction;
+    float p = constrain(fraction, 0.0, 1.0);
+    Serial << "max speed " << fraction << " p " << p << endl;
+    speedServo.writeMicroseconds(1500 + int(p * 500.0));
+  }
+}
+
+void AvcNav::setMaxSpeed() {
+  float pot = AvcLcd::getPotSpeed(200);
+  maxSpeed = pot;
+  AvcEeprom::setMaxSpeed(maxSpeed);
+}
+
+void AvcNav::drive () {
+  if (maxSpeed > 0) {
+    setSpeed(maxSpeed);
+  } else {
+    setSpeed(.25);
+  }
+}
+
 

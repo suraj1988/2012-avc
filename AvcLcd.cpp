@@ -119,3 +119,17 @@ void AvcLcd::waypointSlideshow () {
   } 
 }
 
+void AvcLcd::askSetMaxSpeed(float maxSpeed, boolean refresh) {
+  if (refresh) {
+    lcd.clear();
+    lcd.home();
+    lcd << "SET MAX SPEED?";
+  }
+  lcd.setCursor(0, 1);
+  float n = getPotSpeed(1);
+  lcd << "C " << _FLOAT(maxSpeed, 3) << " ";
+  if (n > 0)
+    lcd << "N " << _FLOAT(n, 3)  << "  ";
+  lcd.setBacklight(HIGH);
+}
+

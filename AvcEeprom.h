@@ -5,10 +5,10 @@
 #include <EEPROM.h>
 
 #define WAY_COUNT  0
-#define GPS_SELECT 1
-#define LOG_ENABLE 2
-#define LOG_TYPE   3
-#define LINE_STEER 4
+#define MAX_SPEED 1 //int
+#define LOG_ENABLE 3
+#define LOG_TYPE   4
+#define LINE_STEER 5
 #define WAY_BASE   16
 
 class AvcEeprom {
@@ -27,6 +27,18 @@ public:
     }
   }
   
+  static void writeInt (int idx, int *val) {
+    byte *bytes = (byte *) val;
+    EEPROM.write(idx, bytes[0]);
+    EEPROM.write(idx + 1, bytes[1]);
+  }
+
+  static void readInt (int idx, int *val) {
+    byte *bytes = (byte *) val;
+    bytes[0] = EEPROM.read(idx);
+    bytes[1] = EEPROM.read(idx + 1);
+  }
+
   static byte getWayCount () {
     return EEPROM.read(WAY_COUNT);
   }
@@ -35,12 +47,16 @@ public:
     EEPROM.write(WAY_COUNT, cnt);
   }
   
-  static boolean getGpsSelect () {
-    return EEPROM.read(GPS_SELECT) == '1';
+  static float getMaxSpeed () {
+    int val;
+    readInt(MAX_SPEED, &val);
+    float r = val  * .001;
+    return r;
   }
   
-  static void setGpsSelect (boolean select) {
-    EEPROM.write(GPS_SELECT, select ? '1' : '0');
+  static void setMaxSpeed (float maxSpeed) {
+    int val = maxSpeed * 1000.0;
+    writeInt(MAX_SPEED, &val);
   }
   
   static boolean getLogEnable () {

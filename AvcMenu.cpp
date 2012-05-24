@@ -57,6 +57,9 @@ void AvcMenu::checkButtons (boolean refresh) {
       case 3:
         lcd->setMode(lcd->WAYPOINTS);
         break;
+      case 4:
+        nav->setMaxSpeed();
+        break;
     }
     refresh = true;
   }
@@ -80,6 +83,9 @@ void AvcMenu::checkButtons (boolean refresh) {
         if (refresh) {
           lcd->askWaypointSlideshow(nav->getNumWaypoints());
         }
+        break;
+      case 4:
+        lcd->askSetMaxSpeed(nav->getMaxSpeed(), refresh);
         break;
     }
   }
