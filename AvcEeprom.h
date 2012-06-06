@@ -3,27 +3,57 @@
 
 #include "Arduino.h"
 #include <EEPROM.h>
+#include "Avc.h"
 
 #define WAY_COUNT  0
 #define MAX_SPEED 1 //int
-#define LOG_ENABLE 3
+#define RUN_LOCATION 3
 #define LOG_TYPE   4
 #define LINE_STEER 5
 #define WAY_BASE   16
+#define PERRY_HIGH (LOC_PERRY_HIGH + 1)  * 50
 
 class AvcEeprom {
+  static void writeLatLon (int idx, long *lat, long *lon, int loc) {
+    idx = idx * 2 + 8;
+    writeLong(idx, lat, loc * 50);
+    writeLong(idx + 1, lon, loc * 50);
+  }
+  
+  static void readLatLon (int idx, long *lat, long *lon, int loc) {
+    idx = idx * 2 + 8;
+    readLong(idx, lat, loc * 50);
+    readLong(idx + 1, lon, loc * 50);
+  }
+
 public:
-  static void writeLong (int idx, long *val) {
+  static void init () {
+#if RESET_RUN_LOCATIONS
+    int z = 0;
+    EEPROM.write(PERRY_HIGH, byte(4));
+    writeInt(PERRY_HIGH + 1, &z);
+    writeInt(PERRY_HIGH + 2, &z);
+    long lat = 33261509, lon = -111751025;
+    writeLatLon(0, &lat, &lon, PERRY_HIGH);
+    lon = -111750192;
+    writeLatLon(1, &lat, &lon, PERRY_HIGH);
+    lat = 33261814;
+    writeLatLon(2, &lat, &lon, PERRY_HIGH);
+    lon = -111751025;
+    writeLatLon(3, &lat, &lon, PERRY_HIGH);
+#endif
+  }
+  static void writeLong (int idx, long *val, int offset) {
     byte *bytes = (byte *) val;
     for (int ii = 0; ii < sizeof(long); ii++) {
-      EEPROM.write((idx * sizeof(long)) + ii + WAY_BASE, bytes[ii]);
+      EEPROM.write((idx * sizeof(long)) + ii + offset, bytes[ii]);
     }
   }
   
-  static void readLong (int idx, long *val) {
+  static void readLong (int idx, long *val, int offset) {
     byte *bytes = (byte *) val;
     for (int ii = 0; ii < sizeof(long); ii++) {
-      bytes[ii] = EEPROM.read((idx * sizeof(long)) + ii + WAY_BASE);
+      bytes[ii] = EEPROM.read((idx * sizeof(long)) + ii + offset);
     }
   }
   
@@ -40,11 +70,11 @@ public:
   }
 
   static byte getWayCount () {
-    return EEPROM.read(WAY_COUNT);
+    return EEPROM.read(getRunLocation() * 50 + WAY_COUNT);
   }
   
   static void setWayCount (byte cnt) {
-    EEPROM.write(WAY_COUNT, cnt);
+    EEPROM.write(getRunLocation() * 50 + WAY_COUNT, cnt);
   }
   
   static float getMaxSpeed () {
@@ -59,12 +89,13 @@ public:
     writeInt(MAX_SPEED, &val);
   }
   
-  static boolean getLogEnable () {
-    return EEPROM.read(LOG_ENABLE) == '1';
+  static byte getRunLocation () {
+    return EEPROM.read(RUN_LOCATION);
   }
   
-  static void setLogEnable (boolean enable) {
-    EEPROM.write(LOG_ENABLE, enable ? '1' : '0');
+  static void setRunLocation (byte loc) {
+    // locations must start at 1
+    EEPROM.write(RUN_LOCATION, loc + 1);
   }
   
   static byte getLogType () {
@@ -84,15 +115,21 @@ public:
   }
   
   static void writeLatLon (int idx, long *lat, long *lon) {
-    idx *= 2;
-    writeLong(idx, lat);
-    writeLong(idx + 1, lon);
+    writeLatLon(idx, lat, lon, getRunLocation() * 50);
   }
   
   static void readLatLon (int idx, long *lat, long *lon) {
-    idx *= 2;
-    readLong(idx, lat);
-    readLong(idx + 1, lon);
+    readLatLon(idx, lat, lon, getRunLocation() * 50);
+  }
+  
+  static void setRunOffset (int lat, int lon) {
+    writeInt(getRunLocation() * 50 + 1, &lat);
+    writeInt(getRunLocation() * 50 + 3, &lon);
+  }
+  
+  static void getRunOffset (int *lat, int *lon) {
+    readInt(getRunLocation() * 50 + 1, lat);
+    readInt(getRunLocation() * 50 + 3, lon);
   }
 };
 #endif

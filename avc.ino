@@ -1,6 +1,5 @@
 #include <Wire.h>
 #include <TinyGPS.h>
-#include "Logger.h"
 #include <Streaming.h>
 #include "AvcPid.h"
 #include "AvcGps.h"
@@ -44,6 +43,7 @@ void setup()
   digitalWrite(MENU_SELECT_PIN, HIGH);
   digitalWrite(MENU_SCROLL_PIN, HIGH);
   digitalWrite(HALL_SENSOR_PIN, HIGH);
+  AvcEeprom::init();
   nav = new AvcNav();
   imu = new AvcImu();
   lcd = new AvcLcd();
@@ -81,7 +81,7 @@ void loop() {
           if (odometerMicrosDelta < 0) {
             odometerMicrosDelta = 4294967295 + odometerMicrosDelta;
           }
-          nav->steer();
+          nav->steer(imu->getMode());
 #if LOG_NAV
           nav->print();
 #endif

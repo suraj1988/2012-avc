@@ -43,22 +43,28 @@ boolean AvcMenu::isButtonPressed (int button) {
 void AvcMenu::checkButtons (boolean refresh) {
   byte button = buttonPressed();
   if (button == MENU_SCROLL_PIN) {
-    currentMenu = (currentMenu + 1) % total;
+    currentMenu = (currentMenu + 1) % ENUM_COUNT;
     refresh = true;
     lcd->setMode(lcd->NONE);
   } else if (button == MENU_SELECT_PIN) {
     switch(currentMenu) {
-      case 1:
+      case SAMPLE:
         nav->startSampling(lcd);
         break;
-      case 2:
+      case RESET:
         nav->resetWaypoints();
         break;
-      case 3:
+      case SLIDESHOW:
         lcd->setMode(lcd->WAYPOINTS);
         break;
-      case 4:
+      case SPEED:
         nav->setMaxSpeed();
+        break;
+      case OFFSET:
+        nav->setOffset();
+        break;
+      case MENU_RUN_LOC:
+        nav->nextRunLocation();
         break;
     }
     refresh = true;
@@ -66,26 +72,37 @@ void AvcMenu::checkButtons (boolean refresh) {
   if (refresh || (millis() - refreshTime) > 500 && lcd->getMode() == lcd->NONE) {
     refreshTime = millis();
     switch(currentMenu) {
-      case 0:
+      case GPS:
         lcd->printGps(nav->getLatitude(), nav->getLongitude(), nav->getHdop(), refresh);
         break;
-      case 1:
+      case SAMPLE:
         if (refresh) {
           lcd->printStartSampling(nav->getNumWaypoints());
         }
         break;
-      case 2:
+      case RESET:
         if (refresh) {
           lcd->askReset(nav->getNumWaypoints());
         }
         break;
-      case 3:
+      case SLIDESHOW:
         if (refresh) {
           lcd->askWaypointSlideshow(nav->getNumWaypoints());
         }
         break;
-      case 4:
+      case SPEED:
         lcd->askSetMaxSpeed(nav->getMaxSpeed(), refresh);
+        break;
+      case HEADING:
+        lcd->trackHeading(nav->getHeadingToWaypoint(), nav->getHeading(), refresh);
+        break;
+      case OFFSET:
+        lcd->askSetOffset(nav->getLatPotentialOffset(), nav->getLonPotentialOffset(), refresh);
+        break;
+      case MENU_RUN_LOC:
+        if (refresh) {
+          lcd->showRunLocation(nav->getRunLocation());
+        }
         break;
     }
   }

@@ -9,7 +9,6 @@
 #include "AvcPid.h"
 #include "AvcLcd.h"
 #include "AvcEeprom.h"
-#include "Logger.h"
 
 #if USE_SERVO_LIBRARY
 #include <Servo.h>
@@ -52,22 +51,55 @@ class AvcNav {
   float previousCte;
   float maxSpeed;
   float previousSpeed;
+  byte runLocation;
+  int steerHeading;
 
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
-  inline int getHeadingToWaypoint () {
-    long lat,lon;
-    AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
-    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(lat), toFloat(lon - longitude));
-  }
   inline boolean checkHdop() {return hdop > .0001 && hdop < 2.0;}
   inline float percentOfServo (float percent) {return (MAX_SERVO - SERVO_CENTER) * percent;}
 
   float crossTrackError ();
   void pickWaypoint();
+  void updateWaypoints();
+  int lineCircle(long,long,long,long,long,long);
+  int lineCircle();
+
+#if LOG_MAPPER
+  void logMapper () {
+    long dec;
+    int integ;
+    printableL (longitude, &integ, &dec);
+    // Log car's lat, lon and bearing to next waypoint
+    Serial << "$CP," <<
+        _FLOAT(toFloat(latitude), 6) <<                  // Car's current latitude
+        "," <<
+        integ << "." << dec <<                  // Car's current longitude
+        "," <<
+        heading << "," <<         // Car's facing angle (with declination correction)
+        steerHeading <<        // Angle to next waypoint
+        endl;
+//    Serial1.print(F(","));
+//    Serial1.print(steerAngle, DEC);       // error that drives steering                    
+//    Serial1.print(F(","));
+//    Serial1.print(getOdoInc(), DEC);      // Odo ticks since last check
+//    Serial1.print(F(","));
+//    Serial1.print(hdop, 2);               // HDOP
+//    Serial1.print(F(","));
+//    Serial1.print(sats, DEC);             // Sats
+//    Serial1.print(F(","));
+//    Serial1.write(fix_type);              // Fix Type
+//    Serial1.println();
+  }
+  
+  inline void printableL (long l, int *i, long *d) {
+    i[0] = int(l / 1000000);
+    d[0] = abs(l - *i * 1000000);
+  }
+#endif
 
 public:
   AvcNav ();
-  void steer ();
+  void steer (AvcImu::Mode);
   void update (AvcImu*);
   void sample (AvcLcd*);
   void resetWaypoints();
@@ -79,6 +111,10 @@ public:
   void setSpeed(float);
   void setMaxSpeed();
   void drive();
+  int getLatPotentialOffset ();
+  int getLonPotentialOffset ();
+  void setOffset ();
+  void nextRunLocation();
   
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
@@ -92,6 +128,12 @@ public:
   inline byte getNumWaypoints() {return numWaypointsSet;}
   inline float getOdometerSpeed() {return odometerSpeed;}
   inline float getMaxSpeed() {return maxSpeed;}
+  inline byte getRunLocation() {return runLocation;}
+  inline int getHeadingToWaypoint () {
+    long lat,lon;
+    AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
+    return (int) TinyGPS::course_to(toFloat(latitude), 0.0f, toFloat(lat), toFloat(lon - longitude));
+  }
 
 #if LOG_NAV
   inline void print() {
@@ -134,8 +176,8 @@ public:
     cte << "\t" <<
     steering << "\t" <<
     steeringAdj << "\t" <<
-    hdop <<
-    nextWaypoint << "\t" <<
+    hdop << "\t" <<
+    nextWaypoint <<
     endl;
   }
 #endif

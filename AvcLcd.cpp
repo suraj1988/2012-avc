@@ -108,6 +108,10 @@ void AvcLcd::waypointSlideshow () {
     byte count = AvcEeprom::getWayCount();
     long lat, lon;
     AvcEeprom::readLatLon (waypointIndex, &lat, &lon);
+    int latOffset, lonOffset;
+    AvcEeprom::getRunOffset (&latOffset, &lonOffset);
+    lat += latOffset;
+    lon += lonOffset;
     lcd.home();
     lcd << _FLOAT(lat/1000000.0, 6);
     lcd.setCursor(0, 1);
@@ -131,5 +135,35 @@ void AvcLcd::askSetMaxSpeed(float maxSpeed, boolean refresh) {
   if (n > 0)
     lcd << "N " << _FLOAT(n, 3)  << "  ";
   lcd.setBacklight(HIGH);
+}
+
+void AvcLcd::trackHeading (int GpsHeading, int compassHeading, boolean refresh) {
+  if (refresh) {
+    lcd.clear();
+  }
+  lcd.home();
+  lcd << "GPS: " << GpsHeading << "  ";
+  lcd.setCursor(0, 1);
+  lcd << "Compass: " << compassHeading << "  ";
+  lcd.setBacklight(HIGH);
+}
+
+void AvcLcd::askSetOffset(int latOffset, int lonOffset, boolean refresh) {
+  if (refresh) {
+    lcd.clear();
+    lcd.setBacklight(HIGH);
+  }
+  lcd.home();
+  lcd << "SET OFFSET?";
+  lcd.setCursor(0, 1);
+  lcd << "LAT: " << latOffset << " LON: " << lonOffset << "   ";
+}
+
+void AvcLcd::showRunLocation(byte runLoc) {
+  lcd.clear();
+  lcd.home();
+  lcd << "LOCATION";
+  lcd.setCursor(0, 1);
+  lcd << runLocNames[runLoc - 1];
 }
 

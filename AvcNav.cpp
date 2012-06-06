@@ -10,8 +10,6 @@ AvcNav::AvcNav (): pid() {
   waasLock = false;
   heading = 0;
   waypointSamplingIndex = -1;
-  numWaypointsSet = max(AvcEeprom::getWayCount(), 0);
-  nextWaypoint = 0;
   bestKnownHeading = 0;
   sampling = false;
   samples = 0;
@@ -23,12 +21,9 @@ AvcNav::AvcNav (): pid() {
   gpsUpdated = false;
   previousPidOffset = 0;
   previousSteering = SERVO_CENTER;
-  if (numWaypointsSet > 0) {
-    AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
-    if (numWaypointsSet > 1) {
-      AvcEeprom::readLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
-    }
-  }
+  runLocation = AvcEeprom::getRunLocation();
+  if (runLocation == 255) runLocation = 1;
+  updateWaypoints();
   pidOffset = 0;
 #if USE_SERVO_LIBRARY
   steeringServo.attach(SERVO_PIN);
@@ -37,6 +32,18 @@ AvcNav::AvcNav (): pid() {
   previousCte = 0;
   maxSpeed = AvcEeprom::getMaxSpeed();
   previousSpeed = 0;
+  steerHeading = 0;
+}
+
+void AvcNav::updateWaypoints() {
+  numWaypointsSet = max(AvcEeprom::getWayCount(), 0);
+  nextWaypoint = 0;
+  if (numWaypointsSet > 0) {
+    AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
+    if (numWaypointsSet > 1) {
+      AvcEeprom::readLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
+    }
+  }
 }
 
 void AvcNav::pickWaypoint() {
@@ -52,89 +59,113 @@ void AvcNav::pickWaypoint() {
       sLat = dLat;
       sLon = dLon;
       AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
+      int latOffset, lonOffset;
+      AvcEeprom::getRunOffset (&latOffset, &lonOffset);
+      dLat += latOffset;
+      dLon += lonOffset;
       reorienting = true;
     }
   }
 }
 
-void AvcNav::steer () {
+void AvcNav::steer (AvcImu::Mode imuMode) {
   pickWaypoint();
   if (numWaypointsSet > 0) {
     int h = getHeadingToWaypoint();
     if (h >= 0 && goodHdop) {
       bestKnownHeading = h;
+      steerHeading = bestKnownHeading;
+#if USE_LINE_INTERSECT
+//      if (!reorienting) {
+        steerHeading = lineCircle(latitude, longitude, sLat, sLon, dLat, dLon);
+//      }
+#endif
+    } else {
+      steerHeading = bestKnownHeading;
     }
   } else {
     bestKnownHeading = 0;
   }
-  float cte = crossTrackError();
+//  float cte = crossTrackError();
   // there might be a problem with fixtime and previous fix time if this code runs a long time. or maybe even a short time.
-  if (gpsUpdated) {
-    pidOffset = pid.compute(cte, (fixTime - previousFixTime)/1000.0, odometerSpeed);
-    previousPidOffset = pidOffset;
-  }
+//  if (gpsUpdated) {
+//    pidOffset = pid.compute(cte, (fixTime - previousFixTime)/1000.0, odometerSpeed);
+//    previousPidOffset = pidOffset;
+//  }
   int steering = SERVO_CENTER;
+  int adj = 0;
   if (!goodHdop || reorienting || COMPASS_ONLY || odometerSpeed < 1 || DISTANCE_FROM_LINE_CORRECTION) {
     pidOffset = 0;
-    int headingOffset = (heading - bestKnownHeading + 360) % 360;
-    if (abs(headingOffset) < 30) {
+    int headingOffset = (heading - steerHeading + 360) % 360;
+    if (abs(heading - bestKnownHeading) < 30) {
       reorienting = false;
     }
+#if AGRESSIVE_STEERING
+    if(headingOffset >= 180) {
+//      headingOffset = constrain(360 - (360 - headingOffset) * 2, 180, 360);
+      
+      steering = map(headingOffset, 180, 360, MAX_SERVO, SERVO_CENTER);
+    } else {
+//      headingOffset = constrain(headingOffset * 2, 0, 180);
+      steering = map(headingOffset, 180, 0, MIN_SERVO, SERVO_CENTER);
+    }
+#else
     if(headingOffset >= 180) {
       steering = map(headingOffset, 180, 360, MAX_SERVO, SERVO_CENTER);
     } else {
       steering = map(headingOffset, 180, 0, MIN_SERVO, SERVO_CENTER);
     }
-    byte maxSteeringDiff = percentOfServo(.05);
-    int adj = 0;
-#if DISTANCE_FROM_LINE_CORRECTION
-    // if approaching the line then allow for faster steering
-    if (abs(cte) < abs(previousCte)) {
-      maxSteeringDiff = percentOfServo(.2);
-    } 
-    if (cte > 0) {
-      adj = int(min(percentOfServo(.1), int(cte * percentOfServo(.025))));
-    } else {
-      adj = int(max(-percentOfServo(.1), int(cte * percentOfServo(.025))));
-    }
-    previousCte = cte;
-//  Serial << bestKnownHeading << "\t";
-//  Serial << heading << "\t";
-//  Serial << cte << "\t";
-//  Serial << adj << "\t";
-//  Serial << steering - SERVO_CENTER << "\t";
-    steering = constrain(steering + adj, MIN_SERVO, MAX_SERVO);
-//  Serial << steering - SERVO_CENTER << endl;
 #endif
-    if (steering - previousSteering > maxSteeringDiff && steering > SERVO_CENTER) {
-      steering = previousSteering + maxSteeringDiff;
-    } else if (steering - previousSteering < -maxSteeringDiff && steering < SERVO_CENTER) {
-      steering = previousSteering - maxSteeringDiff;
-    }
+    byte maxSteeringDiff = percentOfServo(.75);//(.05);
+//#if DISTANCE_FROM_LINE_CORRECTION
+////  float cte = crossTrackError();
+//    // if approaching the line then allow for faster steering
+////    if (abs(cte) < abs(previousCte)) {
+//      maxSteeringDiff = percentOfServo(.3);
+////    } 
+//    if (cte > 0) {
+//      adj = int(min(percentOfServo(.2), int(cte * percentOfServo(.05))));
+//    } else {
+//      adj = int(max(-percentOfServo(.2), int(cte * percentOfServo(.05))));
+//    }
+//    previousCte = cte;
+////  Serial << bestKnownHeading << "\t";
+////  Serial << heading << "\t";
+////  Serial << cte << "\t";
+////  Serial << adj << "\t";
+////  Serial << steering - SERVO_CENTER << "\t";
+//    steering = constrain(steering + adj, MIN_SERVO, MAX_SERVO);
+////  Serial << steering - SERVO_CENTER << endl;
+//#endif
+//    if (steering - previousSteering > maxSteeringDiff && steering > SERVO_CENTER) {
+//      steering = previousSteering + maxSteeringDiff;
+//    } else if (steering - previousSteering < -maxSteeringDiff && steering < SERVO_CENTER) {
+//      steering = previousSteering - maxSteeringDiff;
+//    }
     previousSteering = steering;
-    goodHdop = checkHdop();
-#if !COMPASS_ONLY
-  } else { // use pid
-    if (!gpsUpdated) {
-      pidOffset = previousPidOffset;
-    }
-    if(pidOffset <= 0) {
-      steering = map(pidOffset, -100, 0, MAX_SERVO, SERVO_CENTER);
-    } else {
-      steering = map(pidOffset, 100, 0, MIN_SERVO, SERVO_CENTER);
-    }
-    const byte maxSteeringDiff = 2;
-    if (steering - previousSteering > maxSteeringDiff) {
-      steering = previousSteering + maxSteeringDiff;
-    } else if (steering - previousSteering < -maxSteeringDiff) {
-      steering = previousSteering - maxSteeringDiff;
-    }
-    previousSteering = steering;
-    goodHdop = checkHdop();
-#endif
+//#if !COMPASS_ONLY
+//  } else { // use pid
+//    if (!gpsUpdated) {
+//      pidOffset = previousPidOffset;
+//    }
+//    if(pidOffset <= 0) {
+//      steering = map(pidOffset, -100, 0, MAX_SERVO, SERVO_CENTER);
+//    } else {
+//      steering = map(pidOffset, 100, 0, MIN_SERVO, SERVO_CENTER);
+//    }
+//    const byte maxSteeringDiff = 2;
+//    if (steering - previousSteering > maxSteeringDiff) {
+//      steering = previousSteering + maxSteeringDiff;
+//    } else if (steering - previousSteering < -maxSteeringDiff) {
+//      steering = previousSteering - maxSteeringDiff;
+//    }
+//    previousSteering = steering;
+//    goodHdop = checkHdop();
+//#endif
   }
+  goodHdop = checkHdop();
 #if LOG_HEADING
-  logHeadingData(bestKnownHeading, hdop, steering - SERVO_CENTER, cte, adj, nextWaypoint);
+  logHeadingData(bestKnownHeading, steering - SERVO_CENTER, cte, adj);
 #endif
 
 #if USE_SERVO_LIBRARY
@@ -162,6 +193,9 @@ void AvcNav::updateCompass (AvcImu *imu) {
 }
 
 void AvcNav::updateGps (AvcImu *imu) {
+#if LOG_MAPPER
+  logMapper();
+#endif
   latitude = imu->getLatitude();
   longitude = imu->getLongitude();
   hdop = imu->getHdop();
@@ -199,6 +233,7 @@ void AvcNav::sample (AvcLcd *lcd) {
 
 void AvcNav::resetWaypoints() {
   AvcEeprom::setWayCount(0);
+  AvcEeprom::setRunOffset (0, 0);
   delete tempWaypoint;
   waypointSamplingIndex = -1;
   numWaypointsSet = 0;
@@ -245,7 +280,6 @@ void AvcNav::setSpeed(float fraction) {
   if (abs(previousSpeed - fraction) > .0001) {
     previousSpeed = fraction;
     float p = constrain(fraction, 0.0, 1.0);
-    Serial << "max speed " << fraction << " p " << p << endl;
     speedServo.writeMicroseconds(1500 + int(p * 500.0));
   }
 }
@@ -264,4 +298,105 @@ void AvcNav::drive () {
   }
 }
 
+#if USE_LINE_INTERSECT
+// Compute bearing to point that intersects circle of radius nn
+int AvcNav::lineCircle(long cLat, long cLon, long sLat, long sLon, long dLat, long dLon) {
+  sLat -= cLat;
+  sLon -= cLon;
+  dLat -= cLat;
+  dLon -= cLon;
+  float feet = 40;
+  float radius = (60 * feet) / 31000000;
+  float dx1 = toFloat(dLon - sLon);
+  float dy1 = toFloat(dLat - sLat);
+  // compute the euclidean distance between A and B
+  float lab = sqrt(dx1 * dx1 + dy1 * dy1);
+  // compute the direction vector D from A to B
+  float dvx = dx1 / lab;
+  float dvy = dy1 / lab;
+  // Now the line equation is x = Dx*t + Ax, y = Dy*t + Ay with 0 <= t <= 1.
+  float t = dvx * toFloat(0.0 - sLon) + dvy * toFloat(0.0 - sLat);
+  // compute the coordinates of the point E on line and closest to C
+  float ex = t * dvx + toFloat(sLon);
+  float ey = t * dvy + toFloat(sLat);
+  // compute the euclidean distance from E to C
+  float lec = sqrt(ex * ex + ey * ey);
+  // test if the line intersects the circle
+  if (lec < radius) {
+    // compute distance from t to circle intersection point
+    float dt = sqrt(radius * radius - lec * lec);
+    float iLon = (t + dt) * dvx + toFloat(sLon);
+    float iLat = (t + dt) * dvy + toFloat(sLat);
+    return (int) TinyGPS::course_to(0.0, 0.0, iLat, iLon);
+  }
+  // Return bearing from car to point where perpendicular intersects line
+  return (int) TinyGPS::course_to(0.0, 0.0, ey, ex);
+}
 
+// Compute bearing to point that intersects circle of radius nn
+int AvcNav::lineCircle() {
+  
+//  sLat -= cLat;
+//  sLon -= cLon;
+//  dLat -= cLat;
+//  dLon -= cLon;
+  float feet = 15;
+  float radius = (60 * feet) / 31000000;
+  float distanceBetweenWaypoints = abs(TinyGPS::distance_between(toFloat(sLat), 0.0f, 
+      toFloat(dLat), toFloat(dLon - sLon)));
+  float dx1 = toFloat(dLon - sLon);
+  float dy1 = toFloat(dLat - sLat);
+//  // compute the euclidean distance between A and B
+//  float lab = sqrt(dx1 * dx1 + dy1 * dy1);
+  // compute the direction vector D from A to B
+  float dvx = dx1 / distanceBetweenWaypoints;
+  float dvy = dy1 / distanceBetweenWaypoints;
+  // Now the line equation is x = Dx*t + Ax, y = Dy*t + Ay with 0 <= t <= 1.
+  float t = dvx * toFloat(longitude - sLon) + dvy * toFloat(latitude - sLat);
+  // compute the coordinates of the point E on line and closest to C
+  float ex = t * dvx + toFloat(sLon - longitude);
+  float ey = t * dvy + toFloat(sLat);
+  // compute the euclidean distance from E to C
+  float distanceToLine = abs(TinyGPS::distance_between(toFloat(latitude), 0.0f, 
+      toFloat(ey), toFloat(longitude - ex)));
+//  float lec = sqrt(ex * ex + ey * ey);
+  // test if the line intersects the circle
+  if (distanceToLine < radius) {
+    // compute distance from t to circle intersection point
+    float dt = sqrt(radius * radius - distanceToLine * distanceToLine);
+    float iLon = (t + dt) * dvx + toFloat(longitude - sLon);
+    float iLat = (t + dt) * dvy + toFloat(sLat);
+    return (int) TinyGPS::course_to(latitude, 0.0, iLat, iLon);
+  }
+  // Return bearing from car to point where perpendicular intersects line
+  return (int) TinyGPS::course_to(latitude, 0.0, ey, ex);
+}
+#endif
+
+int AvcNav::getLatPotentialOffset () {
+  long eLat, eLon;
+  AvcEeprom::readLatLon(0, &eLat, &eLon);
+  return latitude - eLat;
+}
+
+int AvcNav::getLonPotentialOffset () {
+  long eLat, eLon;
+  AvcEeprom::readLatLon(0, &eLat, &eLon);
+  return longitude - eLon;
+}
+
+void AvcNav::setOffset () {
+  long eLat, eLon;
+  AvcEeprom::readLatLon(0, &eLat, &eLon);
+  int oLat, oLon;
+  oLat = latitude - eLat;
+  oLon = longitude - eLon;
+  AvcEeprom::setRunOffset(oLat, oLon);
+}
+
+void AvcNav::nextRunLocation () {
+  runLocation = (runLocation + 1) % LOC_COUNT;
+  AvcEeprom::setRunLocation(runLocation);
+  updateWaypoints();
+  pickWaypoint();
+}

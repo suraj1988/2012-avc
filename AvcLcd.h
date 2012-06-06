@@ -22,11 +22,14 @@ public:
   void askReset(byte waypoints);
   void askWaypointSlideshow(byte waypoints);
   void askSetMaxSpeed(float maxSpeed, boolean refresh);
+  void trackHeading (int GpsHeading, int compassHeading, boolean refresh);
+  void askSetOffset(int, int, boolean);
+  void showRunLocation(byte runLoc);
   inline Mode getMode () {return mode;}
   static inline float getPotSpeed(int iterations) {
     int maxPI = 0;
 //    for (int ii = 0; ii < iterations; ii++) {
-      maxPI = max(pulseIn(SPEED_CONTROL_PIN, HIGH), maxPI);
+      maxPI = max(pulseIn(SPEED_CONTROL_PIN, HIGH, 100000), maxPI);
 //    }
     return (maxPI - 1500.0) / 500.0;
   }
