@@ -14,19 +14,25 @@
 #define HALL_SENSOR_PIN 2
 #define RXPIN 4
 #define TXPIN 5
+#define PUSH_BUTTON_START_PIN A2
 
 #define COMPASS_ONLY 1
 #define LOG_PID 0
 #define LOG_HEADING 0
 #define LOG_IMU 0
 #define LOG_NAV 0
-#define LOG_MAPPER 1
+#define LOG_MAPPER 0
 #define DISTANCE_FROM_LINE_CORRECTION 0
 #define USE_SERVO_LIBRARY 1
 #define GO_STRAIGHT 0
 #define USE_LINE_INTERSECT 1
 #define RESET_RUN_LOCATIONS 0
 #define AGRESSIVE_STEERING 1
+#define RACE_MODE 1
+#define BREAK_BEFORE_TURN 0
+#define PUSH_BUTTON_START 1
+#define SPEED_THROUGH_TURN 1
+#define EVASIVE_ACTION 0
 
 enum RunLocation {LOC_MANUAL, LOC_PERRY_HIGH, LOC_COUNT};
 static char* runLocNames[] = {"MANUAL", "PERRY HIGH"};
@@ -34,7 +40,11 @@ static char* runLocNames[] = {"MANUAL", "PERRY HIGH"};
 #if USE_SERVO_LIBRARY
 #define SERVO_CENTER 1500
 #define MIN_SERVO 1000
+#define MIN_SERVO_75_PERCENT 1125
+#define MIN_SERVO_50_PERCENT 1250
 #define MAX_SERVO 2000
+#define MAX_SERVO_75_PERCENT 1875
+#define MAX_SERVO_50_PERCENT 1750
 #else
 #define SERVO_CENTER 180
 #define MIN_SERVO 105

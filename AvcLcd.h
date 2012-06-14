@@ -25,6 +25,8 @@ public:
   void trackHeading (int GpsHeading, int compassHeading, boolean refresh);
   void askSetOffset(int, int, boolean);
   void showRunLocation(byte runLoc);
+  void cameraValues(int, int, int, int, boolean);
+
   inline Mode getMode () {return mode;}
   static inline float getPotSpeed(int iterations) {
     int maxPI = 0;

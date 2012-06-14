@@ -9,12 +9,15 @@
 #include "AvcPid.h"
 #include "AvcLcd.h"
 #include "AvcEeprom.h"
+#include "Gps.h"
 
 #if USE_SERVO_LIBRARY
 #include <Servo.h>
 #endif
 
 #define BUF_SIZE 256
+#define RAMP_UP_FACTOR .004
+#define RAMP_UP_INIT .4
 
 class AvcNav {
   long latitude;
@@ -53,7 +56,24 @@ class AvcNav {
   float previousSpeed;
   byte runLocation;
   int steerHeading;
-
+  boolean startBreaking;
+  long breakingStartTime;
+  boolean killIt;
+  boolean rampUpSpeed;
+  float previousRampUpSpeed;
+  boolean startSpeeding;
+  long speedingStartTime;
+  int cameraX1;
+  int cameraY1;
+  int cameraX2;
+  int cameraY2;
+  int previousCameraX1;
+  int previousCameraY1;
+  int previousCameraX2;
+  int previousCameraY2;
+  boolean objectDetected;
+  unsigned long timeObjectDetected;
+  
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
   inline boolean checkHdop() {return hdop > .0001 && hdop < 2.0;}
   inline float percentOfServo (float percent) {return (MAX_SERVO - SERVO_CENTER) * percent;}
@@ -99,7 +119,7 @@ class AvcNav {
 
 public:
   AvcNav ();
-  void steer (AvcImu::Mode);
+  void steer ();
   void update (AvcImu*);
   void sample (AvcLcd*);
   void resetWaypoints();
@@ -115,7 +135,11 @@ public:
   int getLonPotentialOffset ();
   void setOffset ();
   void nextRunLocation();
-  
+  void updateGps (Gps *loc);
+  void setRampUpSpeed (boolean);
+  void nuetral();
+  void processCamera(AvcImu*);
+
   inline long getLatitude() {return latitude;}
   inline long getLongitude() {return longitude;}
   inline float getHdop() {return hdop;}
@@ -129,6 +153,10 @@ public:
   inline float getOdometerSpeed() {return odometerSpeed;}
   inline float getMaxSpeed() {return maxSpeed;}
   inline byte getRunLocation() {return runLocation;}
+  inline int getCameraX1() { return cameraX1;}
+  inline int getCameraY1() { return cameraY1;}
+  inline int getCameraX2() { return cameraX2;}
+  inline int getCameraY2() { return cameraY2;}
   inline int getHeadingToWaypoint () {
     long lat,lon;
     AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);

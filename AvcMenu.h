@@ -18,7 +18,7 @@ class AvcMenu {
   int buttonPressed();
   boolean isButtonPressed (int button);
   
-  enum MENU {GPS, SAMPLE, RESET, SLIDESHOW, SPEED, HEADING, OFFSET, MENU_RUN_LOC, ENUM_COUNT};
+  enum MENU {GPS, SAMPLE, RESET, SLIDESHOW, SPEED, HEADING, OFFSET, MENU_RUN_LOC, CAMERA, ENUM_COUNT};
 
 public:
   AvcMenu(AvcLcd*, AvcNav*);

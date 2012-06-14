@@ -104,6 +104,9 @@ void AvcMenu::checkButtons (boolean refresh) {
           lcd->showRunLocation(nav->getRunLocation());
         }
         break;
+      case CAMERA:
+        lcd->cameraValues(nav->getCameraX1(), nav->getCameraY1(), nav->getCameraX2(), nav->getCameraY2(), refresh);
+        break;
     }
   }
 }

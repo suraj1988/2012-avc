@@ -44,6 +44,8 @@ void AvcImu::parse (char c) {
               mode = COMPASS;
             } else if (strcmp(pch, "GPS") == 0) {
               mode = GPS;
+            } else if (strcmp(pch, "CAM") == 0) {
+              mode = CAMERA;
             } else {
               mode = IMU;
               latitude = atol(pch);
@@ -56,6 +58,8 @@ void AvcImu::parse (char c) {
               latitude = atol(pch);
             } else if (mode == IMU) {
               longitude = atol(pch);
+            } else if (mode == CAMERA) {
+              cameraX1 = atol(pch);
             }
             break;
           case 2:
@@ -65,6 +69,8 @@ void AvcImu::parse (char c) {
               longitude = atol(pch);
             } else if (mode == IMU) {
               hdop = atof(pch);
+            } else if (mode == CAMERA) {
+              cameraY1 = atol(pch);
             }
             break;
           case 3:
@@ -74,6 +80,8 @@ void AvcImu::parse (char c) {
               hdop = atof(pch);
             } else if (mode == IMU) {
               distanceTraveled = atof(pch);
+            } else if (mode == CAMERA) {
+              cameraX2 = atol(pch);
             }
             break;
           case 4:
@@ -83,6 +91,8 @@ void AvcImu::parse (char c) {
               distanceTraveled = atof(pch);
             } else if (mode == IMU) {
               fixTime = atol(pch);
+            } else if (mode == CAMERA) {
+              cameraY2 = atol(pch);
             }
             break;
           case 5:
@@ -135,5 +145,9 @@ void AvcImu::reset () {
   xOffset = 0;
   yOffset = 0;
   zOffset = 0;
+  cameraX1 = 0;
+  cameraY1 = 0;
+  cameraX2 = 0;
+  cameraY2 = 0;
 }
 

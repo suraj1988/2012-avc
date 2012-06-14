@@ -8,22 +8,28 @@
 #define WAY_COUNT  0
 #define MAX_SPEED 1 //int
 #define RUN_LOCATION 3
-#define LOG_TYPE   4
-#define LINE_STEER 5
-#define WAY_BASE   16
+//#define LOG_TYPE   4
+//#define LINE_STEER 5
+//#define WAY_BASE   16
 #define PERRY_HIGH (LOC_PERRY_HIGH + 1)  * 50
+// run locations
+// int lat offset 0 - 1
+// int lon offset 2 - 3
+// unsed 4 - 7
+// lat lon 8 +
 
 class AvcEeprom {
   static void writeLatLon (int idx, long *lat, long *lon, int loc) {
-    idx = idx * 2 + 8;
-    writeLong(idx, lat, loc * 50);
-    writeLong(idx + 1, lon, loc * 50);
+    Serial << idx << " " << *lat << " " << *lon << " " << loc << endl;
+    idx = idx * 2;
+    writeLong(idx, lat, loc * 50 + 8);
+    writeLong(idx + 1, lon, loc * 50  + 8);
   }
   
   static void readLatLon (int idx, long *lat, long *lon, int loc) {
-    idx = idx * 2 + 8;
-    readLong(idx, lat, loc * 50);
-    readLong(idx + 1, lon, loc * 50);
+    idx = idx * 2;
+    readLong(idx, lat, loc * 50 + 8);
+    readLong(idx + 1, lon, loc * 50 + 8);
   }
 
 public:
@@ -90,7 +96,8 @@ public:
   }
   
   static byte getRunLocation () {
-    return EEPROM.read(RUN_LOCATION);
+//    return EEPROM.read(RUN_LOCATION);
+    return 1;
   }
   
   static void setRunLocation (byte loc) {
@@ -98,28 +105,37 @@ public:
     EEPROM.write(RUN_LOCATION, loc + 1);
   }
   
-  static byte getLogType () {
-    return EEPROM.read(LOG_TYPE);
-  }
+//  static byte getLogType () {
+//    return EEPROM.read(LOG_TYPE);
+//  }
   
-  static void setLogType (byte type) {
-    EEPROM.write(LOG_TYPE, type);
-  }
-  
-  static boolean getLineSteer () {
-    return EEPROM.read(LINE_STEER) == '1';
-  }
-  
-  static void setLineSteer (boolean enable) {
-    EEPROM.write(LINE_STEER, enable ? '1' : '0');
-  }
+//  static void setLogType (byte type) {
+//    EEPROM.write(LOG_TYPE, type);
+//  }
+//  
+//  static boolean getLineSteer () {
+//    return EEPROM.read(LINE_STEER) == '1';
+//  }
+//  
+//  static void setLineSteer (boolean enable) {
+//    EEPROM.write(LINE_STEER, enable ? '1' : '0');
+//  }
   
   static void writeLatLon (int idx, long *lat, long *lon) {
-    writeLatLon(idx, lat, lon, getRunLocation() * 50);
+    writeLatLon(idx, lat, lon, getRunLocation());
   }
   
   static void readLatLon (int idx, long *lat, long *lon) {
-    readLatLon(idx, lat, lon, getRunLocation() * 50);
+    readLatLon(idx, lat, lon, getRunLocation());
+  }
+  
+  static void readOffsetLatLon (int idx, long *lat, long *lon) {
+    readLatLon(idx, lat, lon, getRunLocation());
+    int latOffset = 0;
+    int lonOffset = 0;
+    getRunOffset(&latOffset, &lonOffset);
+    *lat += latOffset;
+    *lon += lonOffset;
   }
   
   static void setRunOffset (int lat, int lon) {
@@ -130,6 +146,24 @@ public:
   static void getRunOffset (int *lat, int *lon) {
     readInt(getRunLocation() * 50 + 1, lat);
     readInt(getRunLocation() * 50 + 3, lon);
+  }
+  
+  static void logEeprom () {
+    for (int ii = 0; ii < 500; ii++) {
+      Serial << ii << " " << EEPROM.read(ii) << endl;
+    }
+    int olat = 0;
+    int olon = 0;
+    AvcEeprom::getRunOffset(&olat, &olon);
+    Serial << olat << endl;
+    Serial << olon << endl;
+    long lat, lon;
+    readLatLon(0, &lat, &lon);
+    Serial << lat << endl;
+    Serial << lon << endl;
+    readOffsetLatLon(0, &lat, &lon);
+    Serial << lat << endl;
+    Serial << lon << endl;
   }
 };
 #endif

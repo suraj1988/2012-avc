@@ -23,6 +23,7 @@ AvcNav::AvcNav (): pid() {
   previousSteering = SERVO_CENTER;
   runLocation = AvcEeprom::getRunLocation();
   if (runLocation == 255) runLocation = 1;
+  nextWaypoint = 0;
   updateWaypoints();
   pidOffset = 0;
 #if USE_SERVO_LIBRARY
@@ -33,15 +34,29 @@ AvcNav::AvcNav (): pid() {
   maxSpeed = AvcEeprom::getMaxSpeed();
   previousSpeed = 0;
   steerHeading = 0;
+  startBreaking = false;
+  killIt = false;
+  rampUpSpeed = false;
+  previousRampUpSpeed = RAMP_UP_INIT;
+  cameraX1 = 0;
+  cameraY1 = 0;
+  cameraX2 = 0;
+  cameraY2 = 0;
+  previousCameraX1 = 0;
+  previousCameraY1 = 0;
+  previousCameraX2 = 0;
+  previousCameraY2 = 0;
+  objectDetected = false;
+  timeObjectDetected = 0;
 }
 
 void AvcNav::updateWaypoints() {
   numWaypointsSet = max(AvcEeprom::getWayCount(), 0);
   nextWaypoint = 0;
   if (numWaypointsSet > 0) {
-    AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
+    AvcEeprom::readOffsetLatLon (nextWaypoint, &dLat, &dLon);
     if (numWaypointsSet > 1) {
-      AvcEeprom::readLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
+      AvcEeprom::readOffsetLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
     }
   }
 }
@@ -54,21 +69,39 @@ void AvcNav::pickWaypoint() {
         toFloat(dLat), toFloat(dLon - sLon));
     float distanceFromStartWaypoint = TinyGPS::distance_between(toFloat(sLat), 0.0f, 
         toFloat(latitude), toFloat(longitude - sLon));
+#if BREAK_BEFORE_TURN
+    if (distanceFromWaypoint < odometerSpeed) {
+      startBreaking = true;
+      breakingStartTime = millis();
+    }
+//    if (distanceFromWaypoint < max(WAYPOINT_RADIUS, odometerSpeed / 2.0) || distanceFromStartWaypoint > distanceBetweenWaypoints) {
+#else
+//    if (distanceFromWaypoint < WAYPOINT_RADIUS || distanceFromStartWaypoint > distanceBetweenWaypoints) {
+#endif
     if (distanceFromWaypoint < WAYPOINT_RADIUS || distanceFromStartWaypoint > distanceBetweenWaypoints) {
-      nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
+#if SPEED_THROUGH_TURN
+      startSpeeding = true;
+      speedingStartTime = millis();      
+#endif
+      if (RACE_MODE) {
+        nextWaypoint = min(nextWaypoint + 1, numWaypointsSet);
+        if (nextWaypoint == numWaypointsSet) {
+          killIt = true;
+        }
+//        nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
+      } else {
+        nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
+      }
+      startBreaking = false;
       sLat = dLat;
       sLon = dLon;
-      AvcEeprom::readLatLon (nextWaypoint, &dLat, &dLon);
-      int latOffset, lonOffset;
-      AvcEeprom::getRunOffset (&latOffset, &lonOffset);
-      dLat += latOffset;
-      dLon += lonOffset;
+      AvcEeprom::readOffsetLatLon (nextWaypoint, &dLat, &dLon);
       reorienting = true;
     }
   }
 }
 
-void AvcNav::steer (AvcImu::Mode imuMode) {
+void AvcNav::steer () {
   pickWaypoint();
   if (numWaypointsSet > 0) {
     int h = getHeadingToWaypoint();
@@ -102,12 +135,12 @@ void AvcNav::steer (AvcImu::Mode imuMode) {
     }
 #if AGRESSIVE_STEERING
     if(headingOffset >= 180) {
-//      headingOffset = constrain(360 - (360 - headingOffset) * 2, 180, 360);
+      headingOffset = constrain(360 - (360 - headingOffset) * 2, 180, 360);
       
-      steering = map(headingOffset, 180, 360, MAX_SERVO, SERVO_CENTER);
+      steering = map(headingOffset, 180, 360, MAX_SERVO_75_PERCENT, SERVO_CENTER);
     } else {
-//      headingOffset = constrain(headingOffset * 2, 0, 180);
-      steering = map(headingOffset, 180, 0, MIN_SERVO, SERVO_CENTER);
+      headingOffset = constrain(headingOffset * 2, 0, 180);
+      steering = map(headingOffset, 180, 0, MIN_SERVO_75_PERCENT, SERVO_CENTER);
     }
 #else
     if(headingOffset >= 180) {
@@ -165,7 +198,7 @@ void AvcNav::steer (AvcImu::Mode imuMode) {
   }
   goodHdop = checkHdop();
 #if LOG_HEADING
-  logHeadingData(bestKnownHeading, steering - SERVO_CENTER, cte, adj);
+  logHeadingData(bestKnownHeading, steering - SERVO_CENTER, /*cte*/0.0, adj);
 #endif
 
 #if USE_SERVO_LIBRARY
@@ -204,6 +237,21 @@ void AvcNav::updateGps (AvcImu *imu) {
   fixTime = imu->getFixTime();
   speed = imu->getSpeed();
   waasLock = imu->hasWaasLock();
+  gpsUpdated = true;
+}
+
+void AvcNav::updateGps (Gps *loc) {
+#if LOG_MAPPER
+  logMapper();
+#endif
+  latitude = loc->getLatitude();
+  longitude = loc->getLongitude();
+  hdop = loc->getHdop();
+  distanceTraveled = loc->getDistanceTraveled();
+  previousFixTime = fixTime;
+  fixTime = loc->getFixTime();
+  speed = loc->getSpeed();
+  waasLock = loc->hasWaasLock();
   gpsUpdated = true;
 }
 
@@ -277,11 +325,20 @@ void AvcNav::updateSpeed(float timeDelta) {
 }
 
 void AvcNav::setSpeed(float fraction) {
-  if (abs(previousSpeed - fraction) > .0001) {
+//  if (abs(previousSpeed - fraction) > .0001) {
     previousSpeed = fraction;
+#if BREAK_BEFORE_TURN
+    float p = 0.0;
+    if (fraction < 0) {
+      p = max(fraction, -1.0);
+    } else {
+      p = min(fraction, 1.0);
+    }
+#else
     float p = constrain(fraction, 0.0, 1.0);
+#endif
     speedServo.writeMicroseconds(1500 + int(p * 500.0));
-  }
+//  }
 }
 
 void AvcNav::setMaxSpeed() {
@@ -291,11 +348,40 @@ void AvcNav::setMaxSpeed() {
 }
 
 void AvcNav::drive () {
+  if (killIt) {
+    setSpeed(-1.0);
+    return;
+  }
+#if BREAK_BEFORE_TURN
+  if (startBreaking && millis() - breakingStartTime < 1000) {
+    setSpeed(.25);
+    return;
+  } else {
+    startBreaking = false;
+  }
+#endif
+#if SPEED_THROUGH_TURN
+  if (startSpeeding && millis() - speedingStartTime < 500) {
+    setSpeed(min(maxSpeed + .2, 1.0));
+    return;
+  } else {
+    startSpeeding = false;
+  }
+#endif
   if (maxSpeed > 0) {
-    setSpeed(maxSpeed);
+    if (rampUpSpeed && previousRampUpSpeed < maxSpeed) {
+      previousRampUpSpeed = previousRampUpSpeed + RAMP_UP_FACTOR;
+      setSpeed(previousRampUpSpeed);
+    } else {
+      setSpeed(maxSpeed);
+    }
   } else {
     setSpeed(.25);
   }
+}
+
+void AvcNav::nuetral() {
+  setSpeed(0);
 }
 
 #if USE_LINE_INTERSECT
@@ -321,6 +407,13 @@ int AvcNav::lineCircle(long cLat, long cLon, long sLat, long sLon, long dLat, lo
   float ey = t * dvy + toFloat(sLat);
   // compute the euclidean distance from E to C
   float lec = sqrt(ex * ex + ey * ey);
+#if EVASIVE_ACTION
+  if (objectDetected && millis() - timeObjectDetected < 1000 && !reorienting) {
+    lec += 6;
+  } else {
+    objectDetected = false;
+  }
+#endif
   // test if the line intersects the circle
   if (lec < radius) {
     // compute distance from t to circle intersection point
@@ -397,6 +490,35 @@ void AvcNav::setOffset () {
 void AvcNav::nextRunLocation () {
   runLocation = (runLocation + 1) % LOC_COUNT;
   AvcEeprom::setRunLocation(runLocation);
+  runLocation = AvcEeprom::getRunLocation();
   updateWaypoints();
   pickWaypoint();
 }
+
+void AvcNav::setRampUpSpeed(boolean r) {
+  rampUpSpeed = r;
+}
+
+void AvcNav::processCamera(AvcImu* imu) {
+  cameraX1 = imu->getCameraX1();
+  cameraY1 = imu->getCameraY1();
+  cameraX2 = imu->getCameraX2();
+  cameraY2 = imu->getCameraY2();
+  if (cameraX1 < 1023 && cameraX1 > 0 
+      && cameraY1 < 1023 && cameraY1 > 0
+      || cameraX2 < 1023 && cameraX2 > 0 
+      && cameraY2 < 1023 && cameraY2 > 0) {
+    if (abs(cameraX1 - previousCameraX1) < 10
+        && abs(cameraY1 - previousCameraY1) < 10
+        || abs(cameraX2 - previousCameraX2) < 10
+        && abs(cameraY2 - previousCameraY2) < 10) {
+      objectDetected = true;
+      timeObjectDetected = millis(); 
+    }
+    previousCameraX1 = cameraX1;
+    previousCameraY1 = cameraY1;
+    previousCameraX2 = cameraX2;
+    previousCameraY2 = cameraY2;
+  }
+}
+

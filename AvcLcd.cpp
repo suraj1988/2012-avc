@@ -156,7 +156,7 @@ void AvcLcd::askSetOffset(int latOffset, int lonOffset, boolean refresh) {
   lcd.home();
   lcd << "SET OFFSET?";
   lcd.setCursor(0, 1);
-  lcd << "LAT: " << latOffset << " LON: " << lonOffset << "   ";
+  lcd << "T: " << latOffset << " N: " << lonOffset << "   ";
 }
 
 void AvcLcd::showRunLocation(byte runLoc) {
@@ -165,5 +165,18 @@ void AvcLcd::showRunLocation(byte runLoc) {
   lcd << "LOCATION";
   lcd.setCursor(0, 1);
   lcd << runLocNames[runLoc - 1];
+}
+
+void AvcLcd::cameraValues(int x1, int y1, int x2, int y2, boolean refresh) {
+  if (refresh) {
+    lcd.clear();
+  }
+  lcd.home();
+  lcd << "X " << x1 << " ";
+  lcd << "Y " << y1 << " ";
+  lcd.setCursor(0, 1);
+  lcd << "X " << x2 << " ";
+  lcd << "Y " << y2 << " ";
+  lcd.setBacklight(HIGH);
 }
 
