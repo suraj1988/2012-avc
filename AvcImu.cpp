@@ -46,6 +46,8 @@ void AvcImu::parse (char c) {
               mode = GPS;
             } else if (strcmp(pch, "CAM") == 0) {
               mode = CAMERA;
+            } else if (strcmp(pch, "MPU") == 0) {
+              mode = MPU;
             } else {
               mode = IMU;
               latitude = atol(pch);
@@ -60,6 +62,8 @@ void AvcImu::parse (char c) {
               longitude = atol(pch);
             } else if (mode == CAMERA) {
               cameraX1 = atol(pch);
+            } else if (mode == MPU) {
+              accelX = atoi(pch);
             }
             break;
           case 2:
@@ -71,6 +75,8 @@ void AvcImu::parse (char c) {
               hdop = atof(pch);
             } else if (mode == CAMERA) {
               cameraY1 = atol(pch);
+            } else if (mode == MPU) {
+              accelY = atoi(pch);
             }
             break;
           case 3:
@@ -82,6 +88,8 @@ void AvcImu::parse (char c) {
               distanceTraveled = atof(pch);
             } else if (mode == CAMERA) {
               cameraX2 = atol(pch);
+            } else if (mode == MPU) {
+              accelZ = atoi(pch);
             }
             break;
           case 4:
@@ -93,6 +101,8 @@ void AvcImu::parse (char c) {
               fixTime = atol(pch);
             } else if (mode == CAMERA) {
               cameraY2 = atol(pch);
+            } else if (mode == MPU) {
+              gyroX = atoi(pch);
             }
             break;
           case 5:
@@ -100,6 +110,8 @@ void AvcImu::parse (char c) {
               fixTime = atol(pch);
             } else if (mode == IMU) {
               speed = atof(pch);
+            } else if (mode == MPU) {
+              gyroY = atoi(pch);
             }
             break;
           case 6:
@@ -107,6 +119,8 @@ void AvcImu::parse (char c) {
               speed = atof(pch);
             } else if (mode == IMU) {
               waasLock = atoi(pch);
+            } else if (mode == MPU) {
+              gyroZ = atoi(pch);
             }
             break;
           case 7:
@@ -114,6 +128,8 @@ void AvcImu::parse (char c) {
               waasLock = atoi(pch);
             } else if (mode == IMU) {
               heading = atoi(pch);
+            } else if (mode == MPU) {
+              temp = atoi(pch);
             }
             break;
         }

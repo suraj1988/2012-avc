@@ -48,17 +48,25 @@ AvcNav::AvcNav (): pid() {
   previousCameraY2 = 0;
   objectDetected = false;
   timeObjectDetected = 0;
+  kalmanTime = millis();
 }
 
 void AvcNav::updateWaypoints() {
   numWaypointsSet = max(AvcEeprom::getWayCount(), 0);
-  nextWaypoint = 0;
-  if (numWaypointsSet > 0) {
-    AvcEeprom::readOffsetLatLon (nextWaypoint, &dLat, &dLon);
-    if (numWaypointsSet > 1) {
-      AvcEeprom::readOffsetLatLon ((nextWaypoint - 1 + numWaypointsSet) % numWaypointsSet, &sLat, &sLon);
-    }
-  }
+//#if SKIP_FIRST_WAYPOINT
+//  nextWaypoint = 1 % numWaypointsSet;
+//#else
+//  nextWaypoint = 0;
+//#endif
+//  if (numWaypointsSet > 0 + SKIP_FIRST_WAYPOINT) {
+//    AvcEeprom::readOffsetLatLon (nextWaypoint, &dLat, &dLon);
+//    if (numWaypointsSet > 1 + SKIP_FIRST_WAYPOINT) {
+//      AvcEeprom::readOffsetLatLon ((nextWaypoint - 1 + numWaypointsSet - RACE_MODE) % numWaypointsSet, &sLat, &sLon);
+//    }
+//  }
+  nextWaypoint = 1;
+  AvcEeprom::readOffsetLatLon (nextWaypoint, &dLat, &dLon);
+  AvcEeprom::readOffsetLatLon (numWaypointsSet - 2, &sLat, &sLon);
 }
 
 void AvcNav::pickWaypoint() {
@@ -78,7 +86,7 @@ void AvcNav::pickWaypoint() {
 #else
 //    if (distanceFromWaypoint < WAYPOINT_RADIUS || distanceFromStartWaypoint > distanceBetweenWaypoints) {
 #endif
-    if (distanceFromWaypoint < WAYPOINT_RADIUS || distanceFromStartWaypoint > distanceBetweenWaypoints) {
+    if (distanceFromWaypoint < WAYPOINT_RADIUS/* || distanceFromStartWaypoint > distanceBetweenWaypoints*/) {
 #if SPEED_THROUGH_TURN
       startSpeeding = true;
       speedingStartTime = millis();      
@@ -91,6 +99,9 @@ void AvcNav::pickWaypoint() {
 //        nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
       } else {
         nextWaypoint = (nextWaypoint + 1) % numWaypointsSet;
+#if SKIP_FIRST_WAYPOINT && nextWaypoint == 0
+        nextWaypoint = 1;
+#endif
       }
       startBreaking = false;
       sLat = dLat;
@@ -200,6 +211,9 @@ void AvcNav::steer () {
 #if LOG_HEADING
   logHeadingData(bestKnownHeading, steering - SERVO_CENTER, /*cte*/0.0, adj);
 #endif
+#if LOG_EKF
+  logEkfData();
+#endif
 
 #if USE_SERVO_LIBRARY
 #if GO_STRAIGHT
@@ -223,6 +237,16 @@ void AvcNav::update (AvcImu *imu) {
 void AvcNav::updateCompass (AvcImu *imu) {
   gpsUpdated = false;
   heading = imu->getHeading();
+}
+
+void AvcNav::updateMpu (AvcImu *imu) {
+  accelX = imu->getAccelX();
+  accelY = imu->getAccelY();
+  accelZ = imu->getAccelZ();
+  gyroX = imu->getGyroX();
+  gyroY = imu->getGyroY();
+  gyroZ = imu->getGyroZ();
+  temp = imu->getTemp();
 }
 
 void AvcNav::updateGps (AvcImu *imu) {

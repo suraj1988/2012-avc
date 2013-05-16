@@ -73,7 +73,7 @@ void AvcMenu::checkButtons (boolean refresh) {
     refreshTime = millis();
     switch(currentMenu) {
       case GPS:
-        lcd->printGps(nav->getLatitude(), nav->getLongitude(), nav->getHdop(), refresh);
+        lcd->printGps(nav->getLatitude(), nav->getLongitude(), nav->getHdop(), refresh, nav->getNextWaypoint());
         break;
       case SAMPLE:
         if (refresh) {

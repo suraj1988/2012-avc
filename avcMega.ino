@@ -36,6 +36,7 @@ void setup()
 {
   Serial.begin(57600);
   Serial1.begin(57600);
+  Serial2.begin(57600);
   Serial3.begin(9600);
 #if !USE_SERVO_LIBRARY
   navSerial.begin(14400);
@@ -90,7 +91,9 @@ void loop() {
           case AvcImu::CAMERA:
             nav->processCamera(imu);
             break;
-        }
+          case AvcImu::MPU:
+            nav->updateMpu(imu);
+            break;        }
         if (!nav->isSampling()) {
           if (odometerMicrosDelta < 0) {
             odometerMicrosDelta = 4294967295 + odometerMicrosDelta;

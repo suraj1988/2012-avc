@@ -35,18 +35,103 @@ class AvcEeprom {
 public:
   static void init () {
 #if RESET_RUN_LOCATIONS
-    int z = 0;
-    EEPROM.write(PERRY_HIGH, byte(4));
-    writeInt(PERRY_HIGH + 1, &z);
-    writeInt(PERRY_HIGH + 2, &z);
-    long lat = 33261509, lon = -111751025;
-    writeLatLon(0, &lat, &lon, PERRY_HIGH);
-    lon = -111750192;
-    writeLatLon(1, &lat, &lon, PERRY_HIGH);
-    lat = 33261814;
-    writeLatLon(2, &lat, &lon, PERRY_HIGH);
-    lon = -111751025;
-    writeLatLon(3, &lat, &lon, PERRY_HIGH);
+//    int z = 0;
+//    EEPROM.write(PERRY_HIGH, byte(4));
+//    writeInt(PERRY_HIGH + 1, &z);
+//    writeInt(PERRY_HIGH + 2, &z);
+//    long lat = 33261509, lon = -111751025;
+//    writeLatLon(0, &lat, &lon, PERRY_HIGH);
+//    lon = -111750192;
+//    writeLatLon(1, &lat, &lon, PERRY_HIGH);
+//    lat = 33261814;
+//    writeLatLon(2, &lat, &lon, PERRY_HIGH);
+//    lon = -111751025;
+//    writeLatLon(3, &lat, &lon, PERRY_HIGH);
+    
+    setWayCount(9);
+//    int latOffset = 0;
+//    int lonOffset = 0;
+//    setRunOffset(latOffset,lonOffset);
+//    long lat = 40065198, lon = -105210021;
+//    writeLatLon(0, &lat, &lon);
+//    lat = 40065158;
+//    lon = -105209770;
+//    writeLatLon(1, &lat, &lon);
+//    lat = 40064823;
+//    writeLatLon(2, &lat, &lon);
+//    lat = 40064483;
+//    writeLatLon(3, &lat, &lon);
+//    lon = -105210067;
+//    writeLatLon(4, &lat, &lon);
+//    lon = -105210449;
+//    writeLatLon(5, &lat, &lon);
+//    lat = 40064521;
+//    writeLatLon(6, &lat, &lon);
+//    lat = 40065166;
+//    writeLatLon(7, &lat, &lon);
+//    lat = 40065158;
+//    lon = -105210075;
+//    writeLatLon(8, &lat, &lon);
+
+//40.065158,-105.210021
+//40.065158,-105.209770
+//40.064823,-105.209808
+//40.064483,-105.209831
+//40.064483,-105.210067
+//40.064514,-105.210449
+//40.064521,-105.210449
+//40.065166,-105.210449
+//40.065158,-105.210075
+
+
+//40.065158,-105.210021
+//40.065158,-105.209770
+//40.064823,-105.209770
+//40.064483,-105.209770
+//40.064483,-105.210067
+//40.064514,-105.210449
+//40.064521,-105.210449
+//40.065166,-105.210449
+//40.065158,-105.210075
+
+
+
+//40.065288,-105.210067
+    long lat = 40065288, lon = -105210067;
+    writeLatLon(0, &lat, &lon);
+//40.065219,-105.209770
+//40.065219,-105.209790
+    lat = 40065219;
+    lon = -10520790;
+    writeLatLon(1, &lat, &lon);
+//40.064884,-105.209808
+    lat = 40064884;
+    lon = -105209808;
+    writeLatLon(2, &lat, &lon);
+//40.064529,-105.209831
+    lat = 40064529;
+    lon = -105209831;
+    writeLatLon(3, &lat, &lon);
+//40.064529,-105.210144
+    lat = 40064529;
+    lon = -105210144;
+    writeLatLon(4, &lat, &lon);
+//40.064529,-105.210449
+    lat = 40064529;
+    lon = -105210449;
+    writeLatLon(5, &lat, &lon);
+//40.064697,-105.210433
+    lat = 40064697;
+    lon = -105210433;
+    writeLatLon(6, &lat, &lon);
+//40.065230,-105.210433
+    lat = 40065230;
+    lon = -105210433;
+    writeLatLon(7, &lat, &lon);
+//40.065254,-105.209770
+    lat = 40065254;
+    lon = -105209770;
+    writeLatLon(8, &lat, &lon);
 #endif
   }
   static void writeLong (int idx, long *val, int offset) {

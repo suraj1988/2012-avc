@@ -57,7 +57,7 @@ void AvcLcd::resetMode () {
   display();
 }
 
-void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh) {
+void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh, int nextWaypoint) {
   if (refresh) {
     lcd.clear();
   }
@@ -67,6 +67,8 @@ void AvcLcd::printGps (long lat, long lon, float hdop, boolean refresh) {
   lcd << _FLOAT(lon/1000000.0, 6);
   lcd.setCursor(12, 0);
   lcd << _FLOAT(hdop, 2);
+  lcd.setCursor(12, 1);
+  lcd << nextWaypoint << "  ";
   lcd.setBacklight(HIGH);
 }
 

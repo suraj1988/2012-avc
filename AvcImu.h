@@ -11,7 +11,7 @@
 
 class AvcImu {
 public:
-  enum Mode {IMU, GPS, COMPASS, CAMERA};
+  enum Mode {IMU, GPS, COMPASS, CAMERA, MPU};
 
 private:
   long latitude;
@@ -35,6 +35,13 @@ private:
   int cameraY1;
   int cameraX2;
   int cameraY2;
+  int gyroX;
+  int gyroY;
+  int gyroZ;
+  int accelX;
+  int accelY;
+  int accelZ;
+  unsigned int temp;
 
 public:
   AvcImu ();
@@ -56,6 +63,13 @@ public:
   inline int getCameraY1() {return cameraY1;}
   inline int getCameraX2() {return cameraX2;}
   inline int getCameraY2() {return cameraY2;}
+  inline int getAccelX() {return accelX;}
+  inline int getAccelY() {return accelY;}
+  inline int getAccelZ() {return accelZ;}
+  inline int getGyroX() {return gyroX;}
+  inline int getGyroY() {return gyroY;}
+  inline int getGyroZ() {return gyroZ;}
+  inline int getTemp() {return temp;}
 #if LOG_IMU
   inline void print() {
     Serial << "IMU" << "\t" <<

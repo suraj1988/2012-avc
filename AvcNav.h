@@ -73,9 +73,13 @@ class AvcNav {
   int previousCameraY2;
   boolean objectDetected;
   unsigned long timeObjectDetected;
-  
+  int accelX, accelY, accelZ;
+  int gyroX, gyroY, gyroZ;
+  unsigned int temp;
+  unsigned int kalmanTime;
+
   inline float toFloat (long fixed) {return fixed / 1000000.0;}
-  inline boolean checkHdop() {return hdop > .0001 && hdop < 2.0;}
+  inline boolean checkHdop() {return hdop > .0001 && hdop < 5.0;}
   inline float percentOfServo (float percent) {return (MAX_SERVO - SERVO_CENTER) * percent;}
 
   float crossTrackError ();
@@ -136,6 +140,7 @@ public:
   void setOffset ();
   void nextRunLocation();
   void updateGps (Gps *loc);
+  void updateMpu(AvcImu*);
   void setRampUpSpeed (boolean);
   void nuetral();
   void processCamera(AvcImu*);
@@ -157,6 +162,7 @@ public:
   inline int getCameraY1() { return cameraY1;}
   inline int getCameraX2() { return cameraX2;}
   inline int getCameraY2() { return cameraY2;}
+  inline int getNextWaypoint() {return nextWaypoint;}
   inline int getHeadingToWaypoint () {
     long lat,lon;
     AvcEeprom::readLatLon (nextWaypoint, &lat, &lon);
@@ -207,6 +213,20 @@ public:
     hdop << "\t" <<
     nextWaypoint <<
     endl;
+  }
+#endif
+#if LOG_EKF
+  void logEkfData () {
+    Serial2 <<
+    _FLOAT(latitude/1000000.0, 6) << "\t" <<
+    _FLOAT(longitude/1000000.0, 6) << "\t" <<
+    _FLOAT(hdop, 2) << "\t" <<
+    odometerSpeed << "\t" <<
+    heading << "\t" <<
+    gyroZ << 
+    _FLOAT((millis() - kalmanTime) / 1000.0, 3) <<
+    endl;
+    kalmanTime = millis();
   }
 #endif
 };

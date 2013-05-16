@@ -17,7 +17,7 @@ public:
   void setMode(Mode);
   void display();
   void resetMode();
-  void printGps(long,long,float,boolean);
+  void printGps(long,long,float,boolean,int);
   void printStartSampling(byte waypoints);
   void askReset(byte waypoints);
   void askWaypointSlideshow(byte waypoints);
